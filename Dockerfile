@@ -23,6 +23,5 @@ ENV PORT=10000
 
 EXPOSE 10000
 
-# Initialize the SQLite database (creates backend/data/database.sqlite)
-# then start PHP's built-in server using router.php for routing
-CMD ["sh", "-c", "php backend/init_db.php && php -S 0.0.0.0:${PORT} router.php"]
+# Ensure the SQLite directory exists, initialize the DB, then start PHP server
+CMD ["sh", "-c", "mkdir -p $(dirname ${DB_PATH:-/app/backend/data/database.sqlite}) && php backend/init_db.php && php -S 0.0.0.0:${PORT} router.php"]
