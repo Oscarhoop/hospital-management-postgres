@@ -1409,30 +1409,43 @@ function editPatient(id) {
 // View Patient Details
 async function viewPatientDetails(id) {
     try {
-        const response = await fetch(API_BASE + `patients.php?id=${id}`);
-        const patient = await response.json();
-        
+        const [patientResponse, recordsResponse] = await Promise.all([
+            fetch(API_BASE + `patients.php?id=${id}`),
+            fetch(API_BASE + `medical_records.php?patient_id=${id}`)
+        ]);
+
+        const patient = await patientResponse.json();
         if (!patient) {
             showAlert('Patient not found', 'error');
             return;
         }
+
+        let medicalRecords = [];
+        if (recordsResponse.ok) {
+            const recordsData = await recordsResponse.json();
+            medicalRecords = Array.isArray(recordsData) ? recordsData : [];
+        } else {
+            console.warn('Failed to load medical records for patient', id);
+        }
         
-        // Show the details modal
         const modal = document.getElementById('patientDetailsModal');
         modal.classList.remove('hidden');
         setTimeout(() => modal.classList.add('show'), 10);
         
-        // Populate the details
-        displayPatientDetailsInModal(patient);
+        displayPatientDetailsInModal(patient, medicalRecords);
     } catch (err) {
+        console.error('Error loading patient details', err);
         showAlert('Error loading patient details: ' + err.message, 'error');
     }
 }
 
-function displayPatientDetailsInModal(p) {
+function displayPatientDetailsInModal(p, medicalRecords = []) {
     const content = document.getElementById('patientDetailsContent');
     
     const age = p.dob ? calculateAge(p.dob) : 'N/A';
+    const canAddRecords = typeof hasPermission === 'function' ? hasPermission('medical_records', 'add') : false;
+    const canViewRecords = typeof hasPermission === 'function' ? hasPermission('medical_records', 'view') : false;
+    const recentRecords = (medicalRecords || []).sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 4);
     
     content.innerHTML = `
         <!-- Patient Header -->
@@ -1564,6 +1577,40 @@ function displayPatientDetailsInModal(p) {
             <div style="background: var(--bg-secondary); padding: 1rem; border-radius: var(--radius); white-space: pre-wrap;">${escapeHtml(p.notes)}</div>
         </div>
         ` : ''}
+
+        <!-- Medical Records Overview -->
+        ${canViewRecords ? `
+        <div style="margin-bottom: 1.5rem;">
+            <div style="display:flex; align-items:center; justify-content: space-between; margin-bottom: 1rem;">
+                <h3 style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin:0;">Medical Records</h3>
+                <div style="display:flex; gap:0.5rem;">
+                    ${canAddRecords ? `<button class="btn btn-sm btn-primary" onclick="openRecordModalForPatient(${p.id})">Add Record</button>` : ''}
+                    <button class="btn btn-sm btn-secondary" onclick="navigateToMedicalRecordsSection(${p.id})">View All</button>
+                </div>
+            </div>
+            ${recentRecords.length > 0 ? `
+            <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                ${recentRecords.map(record => `
+                    <div class="card" style="padding: 1rem; border: 1px solid var(--border-light); border-radius: var(--radius); display:flex; justify-content: space-between; align-items: center; gap:1rem;">
+                        <div>
+                            <div style="font-size:0.75rem; text-transform:uppercase; font-weight:600; color: var(--text-muted);">${escapeHtml((record.record_type || '').replace('_',' ') || 'Record')}</div>
+                            <div style="font-weight:600; font-size:1rem;">${escapeHtml(record.title || 'Untitled record')}</div>
+                            <div style="font-size:0.85rem; color: var(--text-muted);">${formatDateTime(record.created_at)}</div>
+                        </div>
+                        <div style="display:flex; gap:0.5rem;">
+                            <button class="btn btn-sm btn-secondary" onclick="viewRecord(${record.id})">View</button>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+            ` : `
+            <div style="padding:1.25rem; border:1px dashed var(--border-light); border-radius: var(--radius); text-align:center; color: var(--text-muted);">
+                No medical records yet for this patient.
+                ${canAddRecords ? `<div style="margin-top:0.5rem;"><button class=\"btn btn-sm btn-primary\" onclick=\"openRecordModalForPatient(${p.id})\">Add the first record</button></div>` : ''}
+            </div>
+            `}
+        </div>
+        ` : ''}
         
         <!-- Action Buttons -->
         <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 2rem; padding-top: 1.5rem; border-top: 2px solid var(--border-light);">
@@ -1595,6 +1642,27 @@ function closePatientDetails() {
     const modal = document.getElementById('patientDetailsModal');
     modal.classList.remove('show');
     setTimeout(() => modal.classList.add('hidden'), 300);
+}
+
+function navigateToMedicalRecordsSection(patientId) {
+    closePatientDetails();
+    showSection('medical-records');
+    const patientFilter = document.getElementById('recordPatientFilter');
+    if (patientFilter) {
+        patientFilter.value = patientId;
+        filterRecords();
+    }
+}
+
+function openRecordModalForPatient(patientId) {
+    showRecordModal();
+    setTimeout(() => {
+        const patientSelect = document.getElementById('recordPatient');
+        if (patientSelect) {
+            patientSelect.value = patientId;
+            patientSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    }, 250);
 }
 
 function closePatientDetailsAndEdit(id) {
