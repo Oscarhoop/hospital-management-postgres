@@ -23,5 +23,5 @@ ENV PORT=10000
 
 EXPOSE 10000
 
-# Ensure the SQLite directory exists, initialize the DB, run M-Pesa migrations, add sample data, then start PHP server
-CMD ["sh", "-c", "mkdir -p $(dirname ${DB_PATH:-/app/backend/data/database.sqlite}) && php backend/init_db.php && php backend/migrations/add_mpesa_tables.php && php backend/add_sample_kenyan_data.php && php -S 0.0.0.0:${PORT} router.php"]
+# Ensure the SQLite directory exists, initialize the DB, run migrations, seed data, then start PHP server
+CMD ["sh", "-c", "mkdir -p $(dirname ${DB_PATH:-/app/backend/data/database.sqlite}) && php backend/init_db.php && php backend/migrations/add_mpesa_tables.php && php backend/setup_scheduling_tables.php && php backend/add_sample_kenyan_data.php && php -S 0.0.0.0:${PORT} router.php"]
