@@ -278,7 +278,11 @@ async function saveSchedule(event) {
         try { result = await response.json(); } catch (_) { result = {}; }
         
         if (response.ok) {
-            showAlert(result.message || 'Schedule saved successfully', 'success');
+            const title = currentScheduleId ? 'Schedule Updated' : 'Schedule Created';
+            const message = result.message || (currentScheduleId 
+                ? 'Shift details have been updated'
+                : 'New shift added to the roster');
+            showToast(title, message, 'success');
             hideScheduleModal('scheduleModal');
             loadSchedules();
         } else {
@@ -436,7 +440,7 @@ async function deleteSchedule(id) {
         const result = await response.json();
         
         if (response.ok) {
-            showAlert('Schedule cancelled successfully', 'success');
+            showToast('Schedule Cancelled', 'The shift has been removed from the roster', 'success');
             loadSchedules();
         } else {
             showAlert(result.error || 'Failed to cancel schedule', 'error');
@@ -572,7 +576,7 @@ async function submitLeaveRequest(event) {
         const result = await response.json();
         
         if (response.ok) {
-            showAlert(result.message || 'Leave request submitted successfully', 'success');
+            showToast('Leave Request Submitted', result.message || 'Your leave request is now pending approval', 'success');
             hideScheduleModal('leaveRequestModal');
             loadLeaveRequests();
         } else {
@@ -608,7 +612,8 @@ async function updateLeaveStatus(id, status, rejectionReason = null) {
         const result = await response.json();
         
         if (response.ok) {
-            showAlert(result.message || 'Leave request updated', 'success');
+            const statusLabel = (result.message || data.status || 'updated').toString();
+            showToast('Leave Request Updated', statusLabel, 'success');
             loadLeaveRequests();
         } else {
             showAlert(result.error || 'Failed to update leave request', 'error');
