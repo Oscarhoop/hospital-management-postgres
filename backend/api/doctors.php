@@ -67,13 +67,14 @@ try {
             
             $data = read_json();
             $stmt = $pdo->prepare('
-                INSERT INTO doctors (first_name, last_name, specialty, phone, email, notes) 
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO doctors (first_name, last_name, specialty, license_number, phone, email, notes) 
+                VALUES (?, ?, ?, ?, ?, ?, ?)
             ');
             $stmt->execute([
                 $data['first_name'] ?? '',
                 $data['last_name'] ?? '',
                 $data['specialty'] ?? null,
+                $data['license_number'] ?? null,
                 $data['phone'] ?? null,
                 $data['email'] ?? null,
                 $data['notes'] ?? null
@@ -109,13 +110,14 @@ try {
             $data = read_json();
             $stmt = $pdo->prepare('
                 UPDATE doctors SET 
-                    first_name=?, last_name=?, specialty=?, phone=?, email=?, notes=?
+                    first_name=?, last_name=?, specialty=?, license_number=?, phone=?, email=?, notes=?
                 WHERE id=?
             ');
             $stmt->execute([
                 $data['first_name'] ?? '',
                 $data['last_name'] ?? '',
                 $data['specialty'] ?? null,
+                $data['license_number'] ?? null,
                 $data['phone'] ?? null,
                 $data['email'] ?? null,
                 $data['notes'] ?? null,

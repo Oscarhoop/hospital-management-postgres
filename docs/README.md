@@ -35,6 +35,9 @@ Store digital medical records with file upload support. Records are organized by
 ### Billing & Payments
 Create and manage patient bills, track payment status (pending, paid, cancelled), record payment methods, and set due dates. There's revenue analytics to see total revenue and pending payments, plus financial reports.
 
+### M-Pesa Mobile Payments
+Integrated Safaricom Daraja support lets you send STK Push requests directly to patient phones, verify payments automatically, log every M-Pesa interaction, and store receipt numbers alongside billing records. Built-in rate limiting and retry handling make the flow resilient for both sandbox and production environments.
+
 ### Reporting & Analytics
 Dashboard with real-time stats and KPIs. Patient demographics (gender distribution, age groups, monthly registrations), appointment analytics (status distribution, doctor workload, daily trends), revenue analysis (by status, monthly trends, payment methods), and you can export data to CSV for external analysis.
 
@@ -51,6 +54,7 @@ I tried to make it look modern and clean. It's fully responsive so it works on d
 - File upload support for medical documents
 - CORS enabled for cross-origin requests
 - Complete audit logging
+- Safaricom Daraja (M-Pesa) integration with STK Push initiation, callbacks, and transaction logging
 
 ### Frontend
 - Vanilla JavaScript (no framework dependencies - I wanted to keep it simple)
@@ -93,7 +97,13 @@ The database includes tables for users, patients, doctors, appointments, medical
    ```
    This will give you some test data to work with.
 
-6. **Start the server:**
+6. **Configure environment variables:**
+   - `DB_PATH` (optional) to point to a custom SQLite file location
+   - `MPESA_*` keys for sandbox and/or production as documented in `docs/MPESA_INTEGRATION.md`
+   - Any additional secrets (kept outside version control)
+   > Tip: On Render or any container platform, set these via the provider's environment settings rather than committing them.
+
+7. **Start the server:**
    
    On Windows (PowerShell):
    ```powershell
@@ -105,7 +115,14 @@ The database includes tables for users, patients, doctors, appointments, medical
    php -S localhost:8000 router.php
    ```
 
-7. **Open in your browser:**
+   Using Docker (requires Docker Desktop):
+   ```bash
+   docker build -t hospital-management .
+   docker run -p 10000:10000 --env-file .env hospital-management
+   ```
+   The container honors `PORT` and the same `MPESA_*`/`DB_PATH` environment variables.
+
+8. **Open in your browser:**
    ```
    http://localhost:8000/
    ```
@@ -332,7 +349,20 @@ Located in the `setup/` folder:
 - **setup/RBAC_USERS_GUIDE.md** - RBAC user accounts and permissions matrix
 - **setup/STAFF_SCHEDULING_GUIDE.md** - Staff scheduling technical setup guide
 
+**Payments & Deployment:**
+- **docs/MPESA_INTEGRATION.md** - Full Daraja setup guide (credentials, callbacks, testing matrix)
+- **docs/M-PESA_RATE_LIMITING.md** - Handling throttling and retries in production
+- **docs/MPESA_PRODUCTION_SETUP.md** - Hardening tips before going live
+
 *Note: The technical documentation files are optional. All essential information for users is covered in USER_MANUAL.md and TEST_DOCUMENT.md.*
+
+## Payment Integration Checklist (M-Pesa)
+
+1. Configure the sandbox credentials first (see `docs/MPESA_INTEGRATION.md`).
+2. Whitelist your callback URL with Safaricom and ensure it points to `/backend/api/mpesa_callback.php`.
+3. Use the Billing module to trigger STK Push requests—each attempt is logged in `mpesa_transactions` and `mpesa_logs`.
+4. Monitor the **Billing → Payment Status** panel or run the `query_status` API action to track pending transactions.
+5. When ready for production, switch the `MPESA_PROD_*` environment variables and follow the rate-limiting recommendations.
 
 ## Getting Help
 
@@ -349,6 +379,6 @@ This is open source under the MIT License. Feel free to use it, modify it, and s
 
 ---
 
-**Version:** 2.0  
-**Last Updated:** November 2025  
+**Version:** 2.1  
+**Last Updated:** December 2025  
 **Status:** Production Ready
