@@ -51,9 +51,15 @@ try {
 
     $insertedPatientIds = [];
     foreach ($patients as $p) {
-        $stmt = $pdo->prepare('INSERT INTO patients (first_name, last_name, phone, email, notes) VALUES (?, ?, ?, ?, ?) RETURNING id');
-        $stmt->execute([$p['first_name'], $p['last_name'], $p['phone'], $p['email'], 'Sample patient']);
-        $insertedPatientIds[] = $stmt->fetchColumn();
+        if ($driver === 'pgsql') {
+            $stmt = $pdo->prepare('INSERT INTO patients (first_name, last_name, phone, email, notes) VALUES (?, ?, ?, ?, ?) RETURNING id');
+            $stmt->execute([$p['first_name'], $p['last_name'], $p['phone'], $p['email'], 'Sample patient']);
+            $insertedPatientIds[] = $stmt->fetchColumn();
+        } else {
+            $stmt = $pdo->prepare('INSERT INTO patients (first_name, last_name, phone, email, notes) VALUES (?, ?, ?, ?, ?)');
+            $stmt->execute([$p['first_name'], $p['last_name'], $p['phone'], $p['email'], 'Sample patient']);
+            $insertedPatientIds[] = $pdo->lastInsertId();
+        }
     }
 
     // Doctors
@@ -66,9 +72,15 @@ try {
 
     $insertedDoctorIds = [];
     foreach ($doctors as $d) {
-        $stmt = $pdo->prepare('INSERT INTO doctors (first_name, last_name, specialty, phone, email, notes) VALUES (?, ?, ?, ?, ?, ?) RETURNING id');
-        $stmt->execute([$d['first_name'], $d['last_name'], $d['specialty'], $d['phone'], $d['email'], 'Sample doctor']);
-        $insertedDoctorIds[] = $stmt->fetchColumn();
+        if ($driver === 'pgsql') {
+            $stmt = $pdo->prepare('INSERT INTO doctors (first_name, last_name, specialty, phone, email, notes) VALUES (?, ?, ?, ?, ?, ?) RETURNING id');
+            $stmt->execute([$d['first_name'], $d['last_name'], $d['specialty'], $d['phone'], $d['email'], 'Sample doctor']);
+            $insertedDoctorIds[] = $stmt->fetchColumn();
+        } else {
+            $stmt = $pdo->prepare('INSERT INTO doctors (first_name, last_name, specialty, phone, email, notes) VALUES (?, ?, ?, ?, ?, ?)');
+            $stmt->execute([$d['first_name'], $d['last_name'], $d['specialty'], $d['phone'], $d['email'], 'Sample doctor']);
+            $insertedDoctorIds[] = $pdo->lastInsertId();
+        }
     }
 
     // Rooms
@@ -85,9 +97,15 @@ try {
 
     $insertedRoomIds = [];
     foreach ($rooms as $r) {
-        $stmt = $pdo->prepare('INSERT INTO rooms (room_number, room_name, room_type, capacity, notes) VALUES (?, ?, ?, ?, ?) RETURNING id');
-        $stmt->execute([$r['room_number'], $r['room_name'], $r['room_type'], $r['capacity'], 'Sample room']);
-        $insertedRoomIds[] = $stmt->fetchColumn();
+        if ($driver === 'pgsql') {
+            $stmt = $pdo->prepare('INSERT INTO rooms (room_number, room_name, room_type, capacity, notes) VALUES (?, ?, ?, ?, ?) RETURNING id');
+            $stmt->execute([$r['room_number'], $r['room_name'], $r['room_type'], $r['capacity'], 'Sample room']);
+            $insertedRoomIds[] = $stmt->fetchColumn();
+        } else {
+            $stmt = $pdo->prepare('INSERT INTO rooms (room_number, room_name, room_type, capacity, notes) VALUES (?, ?, ?, ?, ?)');
+            $stmt->execute([$r['room_number'], $r['room_name'], $r['room_type'], $r['capacity'], 'Sample room']);
+            $insertedRoomIds[] = $pdo->lastInsertId();
+        }
     }
 
     // Appointments (for the next few days) - use actual patient, doctor, and room IDs
