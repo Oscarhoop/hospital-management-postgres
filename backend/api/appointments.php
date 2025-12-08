@@ -49,21 +49,21 @@ function updateRoomAvailability(PDO $pdo, ?int $roomId, ?string $appointmentStar
     
     // If appointment is cancelled, make room available
     if ($appointmentStatus === 'cancelled') {
-        $stmt = $pdo->prepare('UPDATE rooms SET is_available = 1 WHERE id = ?');
+        $stmt = $pdo->prepare("UPDATE rooms SET is_available = 1 WHERE id = ?");
         $stmt->execute([$roomId]);
         return;
     }
     
     // If appointment start time is in the past, make room available
     if ($appointmentStartTime && strtotime($appointmentStartTime) < time()) {
-        $stmt = $pdo->prepare('UPDATE rooms SET is_available = 1 WHERE id = ?');
+        $stmt = $pdo->prepare("UPDATE rooms SET is_available = 1 WHERE id = ?");
         $stmt->execute([$roomId]);
         return;
     }
     
     // If appointment is scheduled and in the future, make room occupied
     if ($appointmentStartTime && strtotime($appointmentStartTime) >= time()) {
-        $stmt = $pdo->prepare('UPDATE rooms SET is_available = 0 WHERE id = ?');
+        $stmt = $pdo->prepare("UPDATE rooms SET is_available = 0 WHERE id = ?");
         $stmt->execute([$roomId]);
     }
 }
@@ -79,19 +79,19 @@ function checkAndFreeRoom(PDO $pdo, int $roomId): void {
     global $driver;
     $nowExpr = $driver === 'pgsql' ? 'NOW()' : "datetime('now')";
     // Check if room has any active future appointments
-    $stmt = $pdo->prepare('
+    $stmt = $pdo->prepare("
         SELECT COUNT(*) as count 
         FROM appointments 
         WHERE room_id = ? 
         AND status != 'cancelled'
-        AND start_time >= ' . $nowExpr . '
-    ');
+        AND start_time >= " . $nowExpr . "
+    ");
     $stmt->execute([$roomId]);
     $result = $stmt->fetch(PDO::FETCH_ASSOC);
     
     // If no active future appointments, make room available
     if ($result && $result['count'] == 0) {
-        $stmt = $pdo->prepare('UPDATE rooms SET is_available = 1 WHERE id = ?');
+        $stmt = $pdo->prepare("UPDATE rooms SET is_available = 1 WHERE id = ?");
         $stmt->execute([$roomId]);
     }
 }
@@ -112,7 +112,7 @@ function isDoctorAvailable(PDO $pdo, int $doctorId, string $startTime, string $e
 
     // Try to find if this doctor is linked to a user account
     // Check by matching doctor email with user email, or by name
-    $stmt = $pdo->prepare('SELECT email, first_name, last_name FROM doctors WHERE id = ?');
+    $stmt = $pdo->prepare("SELECT email, first_name, last_name FROM doctors WHERE id = ?");
     $stmt->execute([$doctorId]);
     $doctor = $stmt->fetch(PDO::FETCH_ASSOC);
     
@@ -124,7 +124,7 @@ function isDoctorAvailable(PDO $pdo, int $doctorId, string $startTime, string $e
     
     // Try to find matching user by email
     if (!empty($doctor['email'])) {
-        $stmt = $pdo->prepare('SELECT id FROM users WHERE email = ?');
+        $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
         $stmt->execute([$doctor['email']]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
         if ($user) {
@@ -134,7 +134,7 @@ function isDoctorAvailable(PDO $pdo, int $doctorId, string $startTime, string $e
     
     // If no user found by email, try by name
     if (!$userId && !empty($doctor['first_name']) && !empty($doctor['last_name'])) {
-        $stmt = $pdo->prepare('SELECT id FROM users WHERE name LIKE ?');
+        $stmt = $pdo->prepare("SELECT id FROM users WHERE name LIKE ?");
         $namePattern = '%' . $doctor['first_name'] . '%' . $doctor['last_name'] . '%';
         $stmt->execute([$namePattern]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -146,14 +146,14 @@ function isDoctorAvailable(PDO $pdo, int $doctorId, string $startTime, string $e
     // If doctor is linked to a user, check their schedule and leave
     if ($userId) {
         // 1. Check if the doctor has an approved leave request for that day
-        $stmt = $pdo->prepare('
+        $stmt = $pdo->prepare("
             SELECT COUNT(*) 
             FROM leave_requests 
             WHERE user_id = ? 
             AND status = \'approved\' 
             AND start_date <= ? 
             AND end_date >= ?
-        ');
+        ");
         $stmt->execute([$userId, $appointmentDate, $appointmentDate]);
         if ($stmt->fetchColumn() > 0) {
             return false; // Doctor is on leave
@@ -207,7 +207,7 @@ try {
                     $end_time = $_GET['end_time'] ?? '18:00';
                     
                     // Get all doctors first
-                    $stmt = $pdo->prepare('SELECT id, first_name, last_name, specialty FROM doctors ORDER BY last_name, first_name');
+                    $stmt = $pdo->prepare("SELECT id, first_name, last_name, specialty FROM doctors ORDER BY last_name, first_name");
                     $stmt->execute();
                     $all_doctors = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -226,18 +226,18 @@ try {
                         $dateExpr = sql_date_cast('start_time');
                         $startTimeExpr = sql_time_cast('start_time');
                         $endTimeExpr = sql_time_cast('end_time');
-                        $stmt = $pdo->prepare('
+                        $stmt = $pdo->prepare("
                             SELECT COUNT(*) 
                             FROM appointments 
                             WHERE doctor_id = ? 
                             AND status != 'cancelled'
-                            AND ' . $dateExpr . ' = ?
+                            AND " . $dateExpr . " = ?
                             AND (
-                                (' . $startTimeExpr . ' >= ? AND ' . $startTimeExpr . ' < ?)
-                                OR (' . $endTimeExpr . ' > ? AND ' . $endTimeExpr . ' <= ?)
-                                OR (' . $startTimeExpr . ' <= ? AND ' . $endTimeExpr . ' >= ?)
+                                (" . $startTimeExpr . " >= ? AND " . $startTimeExpr . " < ?)
+                                OR (" . $endTimeExpr . " > ? AND " . $endTimeExpr . " <= ?)
+                                OR (" . $startTimeExpr . " <= ? AND " . $endTimeExpr . " >= ?)
                             )
-                        ');
+                        ");
                         $stmt->execute([
                             $doctor['id'], 
                             $date, 
@@ -257,7 +257,7 @@ try {
                     $roomDateExpr = sql_date_cast('start_time');
                     $roomStartExpr = sql_time_cast('start_time');
                     $roomEndExpr = sql_time_cast('end_time');
-                    $stmt = $pdo->prepare('
+                    $stmt = $pdo->prepare("
                         SELECT r.id, r.room_number, r.room_name, r.room_type
                         FROM rooms r
                         WHERE r.is_available = 1
@@ -266,15 +266,15 @@ try {
                             FROM appointments 
                             WHERE room_id IS NOT NULL
                             AND status != 'cancelled'
-                            AND ' . $roomDateExpr . ' = ?
+                            AND " . $roomDateExpr . " = ?
                             AND (
-                                (' . $roomStartExpr . ' >= ? AND ' . $roomStartExpr . ' < ?)
-                                OR (' . $roomEndExpr . ' > ? AND ' . $roomEndExpr . ' <= ?)
-                                OR (' . $roomStartExpr . ' <= ? AND ' . $roomEndExpr . ' >= ?)
+                                (" . $roomStartExpr . " >= ? AND " . $roomStartExpr . " < ?)
+                                OR (" . $roomEndExpr . " > ? AND " . $roomEndExpr . " <= ?)
+                                OR (" . $roomStartExpr . " <= ? AND " . $roomEndExpr . " >= ?)
                             )
                         )
                         ORDER BY r.room_number
-                    ');
+                    ");
                     $stmt->execute([$date, $start_time, $end_time, $start_time, $end_time, $start_time, $end_time]);
                     $available_rooms = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     
@@ -312,7 +312,7 @@ try {
             
             if (isset($_GET['id'])) {
                 // Get single appointment with patient and doctor details
-                $stmt = $pdo->prepare('
+                $stmt = $pdo->prepare("
                     SELECT a.*, 
                            p.first_name as patient_first_name, p.last_name as patient_last_name,
                            d.first_name as doctor_first_name, d.last_name as doctor_last_name, d.specialty,
@@ -322,7 +322,7 @@ try {
                     LEFT JOIN doctors d ON a.doctor_id = d.id
                     LEFT JOIN rooms r ON a.room_id = r.id
                     WHERE a.id = ?
-                ');
+                ");
                 $stmt->execute([$_GET['id']]);
                 $appointment = $stmt->fetch();
                 echo json_encode($appointment ?: null);
@@ -349,7 +349,7 @@ try {
             }
             
             $startDateExpr = sql_date_cast('a.start_time');
-            $endDateExpr = sql_date_cast('a.start_time');
+            $endDateExpr = sql_date_cast('a.end_time');
 
             if (isset($_GET['date_from']) && !empty($_GET['date_from'])) {
                 $whereClause .= " AND {$startDateExpr} >= ?";
@@ -429,7 +429,7 @@ try {
             
             // Check for conflicts with doctor
             if (!empty($data['doctor_id'])) {
-                $stmt = $pdo->prepare('
+                $stmt = $pdo->prepare("
                     SELECT COUNT(*) as count FROM appointments 
                     WHERE doctor_id = ? 
                     AND status != 'cancelled'
@@ -438,7 +438,7 @@ try {
                         (start_time < ? AND end_time > ?) OR
                         (start_time >= ? AND end_time <= ?)
                     )
-                ');
+                ");
                 $stmt->execute([
                     $data['doctor_id'],
                     $endTime, $data['start_time'],
@@ -456,7 +456,7 @@ try {
             
             // Check for conflicts with room
             if (!empty($data['room_id'])) {
-                $stmt = $pdo->prepare('
+                $stmt = $pdo->prepare("
                     SELECT COUNT(*) as count FROM appointments 
                     WHERE room_id = ? 
                     AND status != 'cancelled'
@@ -465,7 +465,7 @@ try {
                         (start_time < ? AND end_time > ?) OR
                         (start_time >= ? AND end_time <= ?)
                     )
-                ');
+                ");
                 $stmt->execute([
                     $data['room_id'],
                     $endTime, $data['start_time'],
@@ -482,7 +482,7 @@ try {
             }
             
             // Check for conflicts with patient (prevent patient double-booking)
-            $stmt = $pdo->prepare('
+            $stmt = $pdo->prepare("
                 SELECT COUNT(*) as count FROM appointments 
                 WHERE patient_id = ? 
                 AND status != 'cancelled'
@@ -491,7 +491,7 @@ try {
                     (start_time < ? AND end_time > ?) OR
                     (start_time >= ? AND end_time <= ?)
                 )
-            ');
+            ");
             $stmt->execute([
                 $data['patient_id'],
                 $endTime, $data['start_time'],
@@ -506,11 +506,11 @@ try {
                 exit;
             }
             
-            $stmt = $pdo->prepare('
+            $stmt = $pdo->prepare("
                 INSERT INTO appointments (
                     patient_id, doctor_id, room_id, start_time, end_time, status, reason, created_by
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ');
+            ");
             $stmt->execute([
                 $data['patient_id'],
                 $data['doctor_id'] ?? null,
@@ -532,7 +532,7 @@ try {
             log_audit_trail('create_appointment', 'appointment', $id, $data);
             
             // Return appointment with patient and doctor details
-            $stmt = $pdo->prepare('
+            $stmt = $pdo->prepare("
                 SELECT a.*, 
                        p.first_name as patient_first_name, p.last_name as patient_last_name,
                        d.first_name as doctor_first_name, d.last_name as doctor_last_name, d.specialty,
@@ -542,7 +542,7 @@ try {
                 LEFT JOIN doctors d ON a.doctor_id = d.id
                 LEFT JOIN rooms r ON a.room_id = r.id
                 WHERE a.id = ?
-            ');
+            ");
             $stmt->execute([$id]);
             echo json_encode($stmt->fetch());
             break;
@@ -565,7 +565,7 @@ try {
             $data = read_json();
             
             // Get current appointment data
-            $stmt = $pdo->prepare('SELECT * FROM appointments WHERE id = ?');
+            $stmt = $pdo->prepare("SELECT * FROM appointments WHERE id = ?");
             $stmt->execute([$id]);
             $current = $stmt->fetch();
             
@@ -600,7 +600,7 @@ try {
 
                 // Check for conflicts with doctor
                 if (!empty($checkDoctorId)) {
-                    $stmt = $pdo->prepare('
+                    $stmt = $pdo->prepare("
                         SELECT COUNT(*) as count FROM appointments 
                         WHERE doctor_id = ? 
                         AND id != ?
@@ -610,7 +610,7 @@ try {
                             (start_time < ? AND end_time > ?) OR
                             (start_time >= ? AND end_time <= ?)
                         )
-                    ');
+                    ");
                     $stmt->execute([
                         $checkDoctorId,
                         $id,
@@ -629,7 +629,7 @@ try {
                 
                 // Check for conflicts with room
                 if (!empty($checkRoomId)) {
-                    $stmt = $pdo->prepare('
+                    $stmt = $pdo->prepare("
                         SELECT COUNT(*) as count FROM appointments 
                         WHERE room_id = ? 
                         AND id != ?
@@ -639,7 +639,7 @@ try {
                             (start_time < ? AND end_time > ?) OR
                             (start_time >= ? AND end_time <= ?)
                         )
-                    ');
+                    ");
                     $stmt->execute([
                         $checkRoomId,
                         $id,
@@ -658,7 +658,7 @@ try {
                 
                 // Check for conflicts with patient
                 if (!empty($checkPatientId)) {
-                    $stmt = $pdo->prepare('
+                    $stmt = $pdo->prepare("
                         SELECT COUNT(*) as count FROM appointments 
                         WHERE patient_id = ? 
                         AND id != ?
@@ -668,7 +668,7 @@ try {
                             (start_time < ? AND end_time > ?) OR
                             (start_time >= ? AND end_time <= ?)
                         )
-                    ');
+                    ");
                     $stmt->execute([
                         $checkPatientId,
                         $id,
@@ -739,7 +739,7 @@ try {
             $stmt->execute($params);
             
             // Get new state for audit log
-            $stmt = $pdo->prepare('SELECT * FROM appointments WHERE id = ?');
+            $stmt = $pdo->prepare("SELECT * FROM appointments WHERE id = ?");
             $stmt->execute([$id]);
             $after = $stmt->fetch(PDO::FETCH_ASSOC);
             
@@ -771,7 +771,7 @@ try {
             log_audit_trail('update_appointment', 'appointment', $id, ['before' => $current, 'after' => $after]);
 
             // Return updated appointment with details
-            $stmt = $pdo->prepare('
+            $stmt = $pdo->prepare("
                 SELECT a.*, 
                        p.first_name as patient_first_name, p.last_name as patient_last_name,
                        d.first_name as doctor_first_name, d.last_name as doctor_last_name, d.specialty,
@@ -781,7 +781,7 @@ try {
                 LEFT JOIN doctors d ON a.doctor_id = d.id
                 LEFT JOIN rooms r ON a.room_id = r.id
                 WHERE a.id = ?
-            ');
+            ");
             $stmt->execute([$id]);
             echo json_encode($stmt->fetch());
             break;
@@ -802,7 +802,7 @@ try {
             }
             
             // Get appointment details before cancelling
-            $stmt = $pdo->prepare('SELECT room_id FROM appointments WHERE id = ?');
+            $stmt = $pdo->prepare("SELECT room_id FROM appointments WHERE id = ?");
             $stmt->execute([$id]);
             $appointment = $stmt->fetch(PDO::FETCH_ASSOC);
             
