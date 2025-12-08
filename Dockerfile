@@ -23,5 +23,4 @@ ENV PORT=10000
 
 EXPOSE 10000
 
-# Run database setup scripts before starting the PHP server
-CMD ["sh", "-c", "php backend/init_db.php && php backend/setup_scheduling_tables.php && php backend/migrations/add_mpesa_tables.php && php -S 0.0.0.0:${PORT} router.php"]
+CMD ["php", "backend/bootstrap.php"]

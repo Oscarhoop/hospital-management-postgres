@@ -69,6 +69,7 @@ CREATE TABLE IF NOT EXISTS leave_requests (
     status TEXT NOT NULL DEFAULT 'pending',
     approved_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
     approved_at TIMESTAMPTZ,
+    rejection_reason TEXT,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 SQL,
@@ -139,6 +140,7 @@ CREATE TABLE IF NOT EXISTS leave_requests (
     status TEXT NOT NULL DEFAULT 'pending',
     approved_by INTEGER,
     approved_at DATETIME,
+    rejection_reason TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (approved_by) REFERENCES users(id) ON DELETE SET NULL
