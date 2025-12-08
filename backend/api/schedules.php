@@ -301,8 +301,13 @@ try {
                 
             } elseif ($action === 'templates') {
                 // Get shift templates
-                $stmt = $db->query("SELECT * FROM shift_templates WHERE is_active = 1 ORDER BY start_time");
-                echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+                try {
+                    $stmt = $db->query("SELECT * FROM shift_templates WHERE is_active = 1 ORDER BY start_time");
+                    echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+                } catch (Exception $e) {
+                    // Table might not exist, return empty array
+                    echo json_encode([]);
+                }
                 
             } elseif ($action === 'leave_requests') {
                 // Get leave requests
