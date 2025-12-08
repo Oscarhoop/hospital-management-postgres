@@ -167,7 +167,7 @@ function isDoctorAvailable(PDO $pdo, int $doctorId, string $startTime, string $e
             FROM staff_schedules
             WHERE user_id = ?
             AND schedule_date = ?
-            AND status != "cancelled"
+            AND status != 'cancelled'
             AND (
                 (start_time <= ? AND end_time > ?) OR
                 (start_time < ? AND end_time >= ?) OR
@@ -432,7 +432,7 @@ try {
                 $stmt = $pdo->prepare('
                     SELECT COUNT(*) as count FROM appointments 
                     WHERE doctor_id = ? 
-                    AND status != "cancelled"
+                    AND status != 'cancelled'
                     AND (
                         (start_time < ? AND end_time > ?) OR
                         (start_time < ? AND end_time > ?) OR
@@ -459,7 +459,7 @@ try {
                 $stmt = $pdo->prepare('
                     SELECT COUNT(*) as count FROM appointments 
                     WHERE room_id = ? 
-                    AND status != "cancelled"
+                    AND status != 'cancelled'
                     AND (
                         (start_time < ? AND end_time > ?) OR
                         (start_time < ? AND end_time > ?) OR
@@ -485,7 +485,7 @@ try {
             $stmt = $pdo->prepare('
                 SELECT COUNT(*) as count FROM appointments 
                 WHERE patient_id = ? 
-                AND status != "cancelled"
+                AND status != 'cancelled'
                 AND (
                     (start_time < ? AND end_time > ?) OR
                     (start_time < ? AND end_time > ?) OR
@@ -604,7 +604,7 @@ try {
                         SELECT COUNT(*) as count FROM appointments 
                         WHERE doctor_id = ? 
                         AND id != ?
-                        AND status != "cancelled"
+                        AND status != 'cancelled'
                         AND (
                             (start_time < ? AND end_time > ?) OR
                             (start_time < ? AND end_time > ?) OR
@@ -633,7 +633,7 @@ try {
                         SELECT COUNT(*) as count FROM appointments 
                         WHERE room_id = ? 
                         AND id != ?
-                        AND status != "cancelled"
+                        AND status != 'cancelled'
                         AND (
                             (start_time < ? AND end_time > ?) OR
                             (start_time < ? AND end_time > ?) OR
@@ -662,7 +662,7 @@ try {
                         SELECT COUNT(*) as count FROM appointments 
                         WHERE patient_id = ? 
                         AND id != ?
-                        AND status != "cancelled"
+                        AND status != 'cancelled'
                         AND (
                             (start_time < ? AND end_time > ?) OR
                             (start_time < ? AND end_time > ?) OR
@@ -809,7 +809,7 @@ try {
             log_audit_trail('cancel_appointment', 'appointment', $id);
 
             // Soft delete - mark as cancelled
-            $stmt = $pdo->prepare('UPDATE appointments SET status = "cancelled", updated_at = CURRENT_TIMESTAMP WHERE id = ?');
+            $stmt = $pdo->prepare('UPDATE appointments SET status = \'cancelled\', updated_at = CURRENT_TIMESTAMP WHERE id = ?');
             $stmt->execute([$id]);
             
             // Free the room if one was assigned
