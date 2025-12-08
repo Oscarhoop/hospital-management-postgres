@@ -40,6 +40,7 @@ if ($runSchedulingSetup) {
 }
 
 run_script('M-Pesa migrations', $backendDir . '/migrations/add_mpesa_tables.php');
+run_script('rejection_reason column migration', $backendDir . '/migrations/add_rejection_reason_column.php');
 
 if ($runSampleData) {
     run_script('Sample Kenyan data seeding', $backendDir . '/add_sample_kenyan_data.php');
