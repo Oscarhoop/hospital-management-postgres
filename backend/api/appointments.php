@@ -33,6 +33,14 @@ function sql_time_cast(string $column): string {
     return $driver === 'pgsql' ? "{$column}::time" : "TIME({$column})";
 }
 
+function sql_bool_condition(string $column, bool $value = true): string {
+    global $driver;
+    $literal = $driver === 'pgsql'
+        ? ($value ? 'TRUE' : 'FALSE')
+        : ($value ? '1' : '0');
+    return "{$column} = {$literal}";
+}
+
 function normalize_nullable_id($value) {
     if (!isset($value) || $value === '' || $value === 'null') {
         return null;
@@ -279,7 +287,7 @@ try {
                         $stmt = $pdo->prepare("
                             SELECT r.id, r.room_number, r.room_name, r.room_type
                             FROM rooms r
-                            WHERE r.is_available = 1
+                            WHERE " . sql_bool_condition('r.is_available', true) . "
                             AND r.id NOT IN (
                                 SELECT DISTINCT room_id 
                                 FROM appointments 
