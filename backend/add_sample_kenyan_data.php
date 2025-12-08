@@ -49,9 +49,11 @@ try {
         ['first_name' => 'Sarah', 'last_name' => 'Chebet', 'phone' => '+254789012345', 'email' => 'sarah.chebet@gmail.com'],
     ];
 
+    $insertedPatientIds = [];
     foreach ($patients as $p) {
-        $stmt = $pdo->prepare('INSERT INTO patients (first_name, last_name, phone, email, notes) VALUES (?, ?, ?, ?, ?)');
+        $stmt = $pdo->prepare('INSERT INTO patients (first_name, last_name, phone, email, notes) VALUES (?, ?, ?, ?, ?) RETURNING id');
         $stmt->execute([$p['first_name'], $p['last_name'], $p['phone'], $p['email'], 'Sample patient']);
+        $insertedPatientIds[] = $stmt->fetchColumn();
     }
 
     // Doctors
@@ -62,9 +64,11 @@ try {
         ['first_name' => 'Peter', 'last_name' => 'Karanja', 'specialty' => 'Surgery', 'phone' => '+254744556677', 'email' => 'peter.karanja@gmail.com'],
     ];
 
+    $insertedDoctorIds = [];
     foreach ($doctors as $d) {
-        $stmt = $pdo->prepare('INSERT INTO doctors (first_name, last_name, specialty, phone, email, notes) VALUES (?, ?, ?, ?, ?, ?)');
+        $stmt = $pdo->prepare('INSERT INTO doctors (first_name, last_name, specialty, phone, email, notes) VALUES (?, ?, ?, ?, ?, ?) RETURNING id');
         $stmt->execute([$d['first_name'], $d['last_name'], $d['specialty'], $d['phone'], $d['email'], 'Sample doctor']);
+        $insertedDoctorIds[] = $stmt->fetchColumn();
     }
 
     // Rooms
@@ -79,22 +83,38 @@ try {
         ['room_number' => '402', 'room_name' => 'Radiology', 'room_type' => 'Radiology', 'capacity' => 2],
     ];
 
+    $insertedRoomIds = [];
     foreach ($rooms as $r) {
-        $stmt = $pdo->prepare('INSERT INTO rooms (room_number, room_name, room_type, capacity, notes) VALUES (?, ?, ?, ?, ?)');
+        $stmt = $pdo->prepare('INSERT INTO rooms (room_number, room_name, room_type, capacity, notes) VALUES (?, ?, ?, ?, ?) RETURNING id');
         $stmt->execute([$r['room_number'], $r['room_name'], $r['room_type'], $r['capacity'], 'Sample room']);
+        $insertedRoomIds[] = $stmt->fetchColumn();
     }
 
-    // Appointments (for the next few days)
-    $appointments = [
-        ['patient_id' => 1, 'doctor_id' => 1, 'room_id' => 1, 'start_time' => '2025-12-04 09:00:00', 'reason' => 'Routine checkup'],
-        ['patient_id' => 2, 'doctor_id' => 2, 'room_id' => 2, 'start_time' => '2025-12-04 10:30:00', 'reason' => 'Child vaccination'],
-        ['patient_id' => 3, 'doctor_id' => 3, 'room_id' => 4, 'start_time' => '2025-12-04 14:00:00', 'reason' => 'Prenatal check'],
-        ['patient_id' => 4, 'doctor_id' => 1, 'room_id' => 1, 'start_time' => '2025-12-05 08:30:00', 'reason' => 'Follow-up'],
-        ['patient_id' => 5, 'doctor_id' => 4, 'room_id' => 5, 'start_time' => '2025-12-05 11:00:00', 'reason' => 'Pre-op assessment'],
-        ['patient_id' => 6, 'doctor_id' => 2, 'room_id' => 2, 'start_time' => '2025-12-05 13:00:00', 'reason' => 'Fever evaluation'],
-        ['patient_id' => 7, 'doctor_id' => 3, 'room_id' => 4, 'start_time' => '2025-12-06 09:30:00', 'reason' => 'Pregnancy test'],
-        ['patient_id' => 8, 'doctor_id' => 1, 'room_id' => 1, 'start_time' => '2025-12-06 15:00:00', 'reason' => 'Blood pressure check'],
+    // Appointments (for the next few days) - use actual patient, doctor, and room IDs
+    $appointments = [];
+    $appointmentData = [
+        ['doctor_index' => 0, 'room_index' => 0, 'start_time' => '2025-12-04 09:00:00', 'reason' => 'Routine checkup'],
+        ['doctor_index' => 1, 'room_index' => 1, 'start_time' => '2025-12-04 10:30:00', 'reason' => 'Child vaccination'],
+        ['doctor_index' => 2, 'room_index' => 3, 'start_time' => '2025-12-04 14:00:00', 'reason' => 'Prenatal check'],
+        ['doctor_index' => 0, 'room_index' => 0, 'start_time' => '2025-12-05 08:30:00', 'reason' => 'Follow-up'],
+        ['doctor_index' => 3, 'room_index' => 4, 'start_time' => '2025-12-05 11:00:00', 'reason' => 'Pre-op assessment'],
+        ['doctor_index' => 1, 'room_index' => 1, 'start_time' => '2025-12-05 13:00:00', 'reason' => 'Fever evaluation'],
+        ['doctor_index' => 2, 'room_index' => 3, 'start_time' => '2025-12-06 09:30:00', 'reason' => 'Pregnancy test'],
+        ['doctor_index' => 0, 'room_index' => 0, 'start_time' => '2025-12-06 15:00:00', 'reason' => 'Blood pressure check'],
     ];
+
+    // Create appointments using actual patient, doctor, and room IDs
+    foreach ($appointmentData as $index => $a) {
+        if (isset($insertedPatientIds[$index]) && isset($insertedDoctorIds[$a['doctor_index']]) && isset($insertedRoomIds[$a['room_index']])) {
+            $appointments[] = [
+                'patient_id' => $insertedPatientIds[$index],
+                'doctor_id' => $insertedDoctorIds[$a['doctor_index']],
+                'room_id' => $insertedRoomIds[$a['room_index']],
+                'start_time' => $a['start_time'],
+                'reason' => $a['reason']
+            ];
+        }
+    }
 
     foreach ($appointments as $a) {
         $stmt = $pdo->prepare('INSERT INTO appointments (patient_id, doctor_id, room_id, start_time, end_time, status, reason, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
