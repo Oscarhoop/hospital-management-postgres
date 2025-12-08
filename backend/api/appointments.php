@@ -83,7 +83,7 @@ function checkAndFreeRoom(PDO $pdo, int $roomId): void {
         SELECT COUNT(*) as count 
         FROM appointments 
         WHERE room_id = ? 
-        AND status != \'cancelled\'
+        AND status != 'cancelled'
         AND start_time >= ' . $nowExpr . '
     ');
     $stmt->execute([$roomId]);
@@ -162,7 +162,7 @@ function isDoctorAvailable(PDO $pdo, int $doctorId, string $startTime, string $e
         // 2. Check if the doctor is scheduled to work during the appointment time
         // If they have a schedule, verify it matches the appointment time
         // If no schedule exists, allow it (flexible scheduling - they might work without being scheduled)
-        $stmt = $pdo->prepare('
+        $stmt = $pdo->prepare("
             SELECT COUNT(*)
             FROM staff_schedules
             WHERE user_id = ?
@@ -173,7 +173,7 @@ function isDoctorAvailable(PDO $pdo, int $doctorId, string $startTime, string $e
                 (start_time < ? AND end_time >= ?) OR
                 (start_time >= ? AND end_time <= ?)
             )
-        ');
+        ");
         $stmt->execute([
             $userId, 
             $appointmentDate,
@@ -230,7 +230,7 @@ try {
                             SELECT COUNT(*) 
                             FROM appointments 
                             WHERE doctor_id = ? 
-                            AND status != \'cancelled\'
+                            AND status != 'cancelled'
                             AND ' . $dateExpr . ' = ?
                             AND (
                                 (' . $startTimeExpr . ' >= ? AND ' . $startTimeExpr . ' < ?)
@@ -265,7 +265,7 @@ try {
                             SELECT DISTINCT room_id 
                             FROM appointments 
                             WHERE room_id IS NOT NULL
-                            AND status != \'cancelled\'
+                            AND status != 'cancelled'
                             AND ' . $roomDateExpr . ' = ?
                             AND (
                                 (' . $roomStartExpr . ' >= ? AND ' . $roomStartExpr . ' < ?)
@@ -809,7 +809,7 @@ try {
             log_audit_trail('cancel_appointment', 'appointment', $id);
 
             // Soft delete - mark as cancelled
-            $stmt = $pdo->prepare('UPDATE appointments SET status = \'cancelled\', updated_at = CURRENT_TIMESTAMP WHERE id = ?');
+            $stmt = $pdo->prepare("UPDATE appointments SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE id = ?");
             $stmt->execute([$id]);
             
             // Free the room if one was assigned
