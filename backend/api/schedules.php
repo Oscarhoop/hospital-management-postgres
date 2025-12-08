@@ -18,6 +18,26 @@ session_start();
 
 require_once __DIR__ . '/../db.php';
 
+function ensure_shift_templates(PDO $db) {
+    try {
+        $count = (int)$db->query("SELECT COUNT(*) FROM shift_templates")->fetchColumn();
+        if ($count === 0) {
+            $templates = [
+                ['Morning Shift', '08:00:00', '16:00:00', '#4CAF50'],
+                ['Afternoon Shift', '14:00:00', '22:00:00', '#2196F3'],
+                ['Night Shift', '22:00:00', '06:00:00', '#9C27B0'],
+                ['Weekend Shift', '09:00:00', '17:00:00', '#FF9800']
+            ];
+            $stmt = $db->prepare("INSERT INTO shift_templates (name, start_time, end_time, color) VALUES (?, ?, ?, ?)");
+            foreach ($templates as $tpl) {
+                $stmt->execute($tpl);
+            }
+        }
+    } catch (Exception $e) {
+        error_log('ensure_shift_templates error: ' . $e->getMessage());
+    }
+}
+
 try {
     $db = get_pdo();
     $driver = get_db_driver();
@@ -302,6 +322,7 @@ try {
             } elseif ($action === 'templates') {
                 // Get shift templates
                 try {
+                    ensure_shift_templates($db);
                     $stmt = $db->query("SELECT * FROM shift_templates WHERE is_active = 1 ORDER BY start_time");
                     echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
                 } catch (Exception $e) {

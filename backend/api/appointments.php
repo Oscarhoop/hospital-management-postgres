@@ -33,6 +33,13 @@ function sql_time_cast(string $column): string {
     return $driver === 'pgsql' ? "{$column}::time" : "TIME({$column})";
 }
 
+function normalize_nullable_id($value) {
+    if (!isset($value) || $value === '' || $value === 'null') {
+        return null;
+    }
+    return is_numeric($value) ? (int) $value : $value;
+}
+
 /**
  * Update room availability status based on appointments
  * 
@@ -440,20 +447,23 @@ try {
                 echo json_encode(['error' => 'Patient ID and start time are required']);
                 exit;
             }
+            $patientId = (int) $data['patient_id'];
+            $doctorId = normalize_nullable_id($data['doctor_id'] ?? null);
+            $roomId = normalize_nullable_id($data['room_id'] ?? null);
             
             $endTime = $data['end_time'] ?? date('Y-m-d H:i:s', strtotime($data['start_time'] . ' +1 hour'));
 
             // Check if doctor is scheduled and not on leave
-            if (!empty($data['doctor_id'])) {
-                if (!isDoctorAvailable($pdo, $data['doctor_id'], $data['start_time'], $endTime)) {
+            if (!empty($data['doctor_id']) && $doctorId) {
+                if (!isDoctorAvailable($pdo, $doctorId, $data['start_time'], $endTime)) {
                     http_response_code(409);
                     echo json_encode(['error' => 'The selected doctor is not scheduled to work or is on leave at this time.']);
                     exit;
                 }
             }
-            
+
             // Check for conflicts with doctor
-            if (!empty($data['doctor_id'])) {
+            if ($doctorId) {
                 $stmt = $pdo->prepare("
                     SELECT COUNT(*) as count FROM appointments 
                     WHERE doctor_id = ? 
@@ -480,7 +490,7 @@ try {
             }
             
             // Check for conflicts with room
-            if (!empty($data['room_id'])) {
+            if ($roomId) {
                 $stmt = $pdo->prepare("
                     SELECT COUNT(*) as count FROM appointments 
                     WHERE room_id = ? 
@@ -537,9 +547,9 @@ try {
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ");
             $stmt->execute([
-                $data['patient_id'],
-                $data['doctor_id'] ?? null,
-                $data['room_id'] ?? null,
+                $patientId,
+                $doctorId,
+                $roomId,
                 $data['start_time'],
                 $endTime,
                 $data['status'] ?? 'scheduled',
@@ -550,8 +560,8 @@ try {
             $id = $pdo->lastInsertId();
             
             // Update room availability if room is assigned
-            if (!empty($data['room_id'])) {
-                updateRoomAvailability($pdo, $data['room_id'], $data['start_time'], $data['status'] ?? 'scheduled');
+            if ($roomId) {
+                updateRoomAvailability($pdo, $roomId, $data['start_time'], $data['status'] ?? 'scheduled');
             }
             
             log_audit_trail('create_appointment', 'appointment', $id, $data);
