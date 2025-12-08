@@ -852,6 +852,16 @@ try {
     
 } catch (Exception $e) {
     http_response_code(500);
-    echo json_encode(['error' => $e->getMessage()]);
+    error_log('Appointments API Error: ' . $e->getMessage() . ' | Trace: ' . $e->getTraceAsString());
+    echo json_encode([
+        'error' => $e->getMessage(),
+        'trace' => $e->getTraceAsString(),
+        'debug_info' => [
+            'method' => $_SERVER['REQUEST_METHOD'] ?? 'unknown',
+            'session_user_id' => $_SESSION['user_id'] ?? 'not_set',
+            'post_data' => file_get_contents('php://input'),
+            'driver' => $driver ?? 'not_set'
+        ]
+    ]);
 }
 ?>
