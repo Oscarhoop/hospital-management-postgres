@@ -3408,10 +3408,12 @@ async function checkAvailability() {
         }
         
         displayAvailability(data);
-    } catch (err) {
-        console.error('Error checking availability:', err);
-        showAlert('Error checking availability: ' + err.message, 'error');
-        resultsDiv.innerHTML = '<div class="empty-availability">Error loading availability: ' + escapeHtml(err.message) + '<br>Please check the console for more details.</div>';
+    } catch (error) {
+        console.error('Error checking availability:', error);
+        const errorData = await error.response.json();
+        console.error('Error response:', errorData);
+        document.getElementById('availabilityResults').innerHTML = 
+            `<div class="alert alert-danger">Error checking availability: ${errorData.error || error.message}</div>`;
     }
 }
 

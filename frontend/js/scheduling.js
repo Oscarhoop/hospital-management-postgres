@@ -221,13 +221,18 @@ async function loadShiftTemplates() {
     try {
         const response = await fetch(`${API_BASE}schedules.php?action=templates`);
         shiftTemplates = await response.json();
+        console.log('Shift templates loaded:', shiftTemplates);
         
         const select = document.getElementById('scheduleTemplate');
         select.innerHTML = '<option value="">Custom Shift</option>';
         
-        shiftTemplates.forEach(template => {
-            select.innerHTML += `<option value="${template.id}">${template.name} (${formatTime(template.start_time)} - ${formatTime(template.end_time)})</option>`;
-        });
+        if (Array.isArray(shiftTemplates)) {
+            shiftTemplates.forEach(template => {
+                select.innerHTML += `<option value="${template.id}">${template.name} (${formatTime(template.start_time)} - ${formatTime(template.end_time)})</option>`;
+            });
+        } else {
+            console.error('Shift templates is not an array:', shiftTemplates);
+        }
     } catch (error) {
         console.error('Error loading shift templates:', error);
     }
