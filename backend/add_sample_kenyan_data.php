@@ -98,12 +98,12 @@ try {
     $insertedRoomIds = [];
     foreach ($rooms as $r) {
         if ($driver === 'pgsql') {
-            $stmt = $pdo->prepare('INSERT INTO rooms (room_number, room_name, room_type, capacity, notes) VALUES (?, ?, ?, ?, ?) RETURNING id');
-            $stmt->execute([$r['room_number'], $r['room_name'], $r['room_type'], $r['capacity'], 'Sample room']);
+            $stmt = $pdo->prepare('INSERT INTO rooms (room_number, room_name, room_type, capacity, is_available, notes) VALUES (?, ?, ?, ?, ?, ?) RETURNING id');
+            $stmt->execute([$r['room_number'], $r['room_name'], $r['room_type'], $r['capacity'], true, 'Sample room']);
             $insertedRoomIds[] = $stmt->fetchColumn();
         } else {
-            $stmt = $pdo->prepare('INSERT INTO rooms (room_number, room_name, room_type, capacity, notes) VALUES (?, ?, ?, ?, ?)');
-            $stmt->execute([$r['room_number'], $r['room_name'], $r['room_type'], $r['capacity'], 'Sample room']);
+            $stmt = $pdo->prepare('INSERT INTO rooms (room_number, room_name, room_type, capacity, is_available, notes) VALUES (?, ?, ?, ?, ?, ?)');
+            $stmt->execute([$r['room_number'], $r['room_name'], $r['room_type'], $r['capacity'], 1, 'Sample room']);
             $insertedRoomIds[] = $pdo->lastInsertId();
         }
     }
