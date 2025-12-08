@@ -31,9 +31,8 @@ $runDbReset = env_flag('RUN_DB_RESET', false);
 $runSchedulingSetup = env_flag('RUN_SCHEDULING_SETUP', true);
 $runSampleData = env_flag('RUN_SAMPLE_DATA', true);
 
-if ($runDbReset) {
-    run_script('Database initialization', $backendDir . '/init_db.php');
-}
+// Always run database initialization (it's safe to run on existing DB)
+run_script('Database initialization', $backendDir . '/init_db.php');
 
 if ($runSchedulingSetup) {
     run_script('Scheduling tables setup', $backendDir . '/setup_scheduling_tables.php');
