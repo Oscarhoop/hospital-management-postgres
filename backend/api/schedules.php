@@ -179,9 +179,9 @@ try {
                         LEFT JOIN patients p ON a.patient_id = p.id
                         LEFT JOIN doctors d ON a.doctor_id = d.id
                         LEFT JOIN rooms r ON a.room_id = r.id
-                        WHERE DATE(a.start_time) = :schedule_date
-                        AND TIME(a.start_time) >= :start_time 
-                        AND TIME(a.start_time) < :end_time
+                        WHERE a.start_time::date = :schedule_date
+                        AND a.start_time::time >= :start_time 
+                        AND a.start_time::time < :end_time
                         AND a.status != 'cancelled'
                         AND (
                             -- Match by doctor email if user email matches
@@ -236,9 +236,9 @@ try {
                            LEFT JOIN doctors d ON a.doctor_id = d.id
                            LEFT JOIN users u2 ON (d.email = u2.email OR (d.first_name || ' ' || d.last_name) LIKE '%' || u2.name || '%')
                            WHERE u2.id = ss.user_id
-                           AND DATE(a.start_time) = ss.schedule_date
-                           AND TIME(a.start_time) >= ss.start_time
-                           AND TIME(a.start_time) < ss.end_time
+                           AND a.start_time::date = ss.schedule_date
+                           AND a.start_time::time >= ss.start_time
+                           AND a.start_time::time < ss.end_time
                            AND a.status != 'cancelled') as patient_names"
                     : "(SELECT GROUP_CONCAT(p.first_name || ' ' || p.last_name)
                            FROM appointments a
@@ -260,9 +260,9 @@ try {
                                 LEFT JOIN doctors d ON a.doctor_id = d.id
                                 LEFT JOIN users u2 ON (d.email = u2.email OR (d.first_name || ' ' || d.last_name) LIKE '%' || u2.name || '%')
                                 WHERE u2.id = ss.user_id
-                                AND DATE(a.start_time) = ss.schedule_date
-                                AND TIME(a.start_time) >= ss.start_time 
-                                AND TIME(a.start_time) < ss.end_time
+                                AND a.start_time::date = ss.schedule_date
+                                AND a.start_time::time >= ss.start_time 
+                                AND a.start_time::time < ss.end_time
                                 AND a.status != 'cancelled') as appointment_count,
                                {$patientNamesSubquery}
                         FROM staff_schedules ss

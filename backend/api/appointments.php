@@ -10,6 +10,7 @@ require_once __DIR__ . '/permissions.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 $pdo = get_pdo();
+$driver = get_db_driver();
 
 // Helper functions
 function read_json() {
@@ -20,6 +21,16 @@ function read_json() {
 
 function is_logged_in() {
     return isset($_SESSION['user_id']) && !empty($_SESSION['user_id']);
+}
+
+function sql_date_cast(string $column): string {
+    global $driver;
+    return $driver === 'pgsql' ? "{$column}::date" : "DATE({$column})";
+}
+
+function sql_time_cast(string $column): string {
+    global $driver;
+    return $driver === 'pgsql' ? "{$column}::time" : "TIME({$column})";
 }
 
 /**
@@ -65,13 +76,15 @@ function updateRoomAvailability(PDO $pdo, ?int $roomId, ?string $appointmentStar
  * @return void
  */
 function checkAndFreeRoom(PDO $pdo, int $roomId): void {
+    global $driver;
+    $nowExpr = $driver === 'pgsql' ? 'NOW()' : "datetime('now')";
     // Check if room has any active future appointments
     $stmt = $pdo->prepare('
         SELECT COUNT(*) as count 
         FROM appointments 
         WHERE room_id = ? 
-        AND status != "cancelled"
-        AND start_time >= datetime("now")
+        AND status != \'cancelled\'
+        AND start_time >= ' . $nowExpr . '
     ');
     $stmt->execute([$roomId]);
     $result = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -210,16 +223,19 @@ try {
                         }
                         
                         // Check if doctor has conflicting appointments
+                        $dateExpr = sql_date_cast('start_time');
+                        $startTimeExpr = sql_time_cast('start_time');
+                        $endTimeExpr = sql_time_cast('end_time');
                         $stmt = $pdo->prepare('
                             SELECT COUNT(*) 
                             FROM appointments 
                             WHERE doctor_id = ? 
-                            AND status != "cancelled"
-                            AND DATE(start_time) = ?
+                            AND status != \'cancelled\'
+                            AND ' . $dateExpr . ' = ?
                             AND (
-                                (TIME(start_time) >= ? AND TIME(start_time) < ?)
-                                OR (TIME(end_time) > ? AND TIME(end_time) <= ?)
-                                OR (TIME(start_time) <= ? AND TIME(end_time) >= ?)
+                                (' . $startTimeExpr . ' >= ? AND ' . $startTimeExpr . ' < ?)
+                                OR (' . $endTimeExpr . ' > ? AND ' . $endTimeExpr . ' <= ?)
+                                OR (' . $startTimeExpr . ' <= ? AND ' . $endTimeExpr . ' >= ?)
                             )
                         ');
                         $stmt->execute([
@@ -238,6 +254,9 @@ try {
                     }
 
                     // Get available rooms
+                    $roomDateExpr = sql_date_cast('start_time');
+                    $roomStartExpr = sql_time_cast('start_time');
+                    $roomEndExpr = sql_time_cast('end_time');
                     $stmt = $pdo->prepare('
                         SELECT r.id, r.room_number, r.room_name, r.room_type
                         FROM rooms r
@@ -246,12 +265,12 @@ try {
                             SELECT DISTINCT room_id 
                             FROM appointments 
                             WHERE room_id IS NOT NULL
-                            AND status != "cancelled"
-                            AND DATE(start_time) = ?
+                            AND status != \'cancelled\'
+                            AND ' . $roomDateExpr . ' = ?
                             AND (
-                                (TIME(start_time) >= ? AND TIME(start_time) < ?)
-                                OR (TIME(end_time) > ? AND TIME(end_time) <= ?)
-                                OR (TIME(start_time) <= ? AND TIME(end_time) >= ?)
+                                (' . $roomStartExpr . ' >= ? AND ' . $roomStartExpr . ' < ?)
+                                OR (' . $roomEndExpr . ' > ? AND ' . $roomEndExpr . ' <= ?)
+                                OR (' . $roomStartExpr . ' <= ? AND ' . $roomEndExpr . ' >= ?)
                             )
                         )
                         ORDER BY r.room_number
@@ -329,13 +348,16 @@ try {
                 $params[] = $_GET['status'];
             }
             
+            $startDateExpr = sql_date_cast('a.start_time');
+            $endDateExpr = sql_date_cast('a.start_time');
+
             if (isset($_GET['date_from']) && !empty($_GET['date_from'])) {
-                $whereClause .= " AND DATE(a.start_time) >= ?";
+                $whereClause .= " AND {$startDateExpr} >= ?";
                 $params[] = $_GET['date_from'];
             }
             
             if (isset($_GET['date_to']) && !empty($_GET['date_to'])) {
-                $whereClause .= " AND DATE(a.start_time) <= ?";
+                $whereClause .= " AND {$endDateExpr} <= ?";
                 $params[] = $_GET['date_to'];
             }
             
