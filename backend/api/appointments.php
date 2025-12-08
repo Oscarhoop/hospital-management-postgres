@@ -321,7 +321,16 @@ try {
                     http_response_code(500);
                     $errorMsg = 'Error checking availability: ' . $e->getMessage();
                     error_log('Availability check error: ' . $e->getMessage() . ' | Trace: ' . $e->getTraceAsString());
-                    echo json_encode(['error' => $errorMsg, 'trace' => $e->getTraceAsString()]);
+                    echo json_encode([
+                        'error' => $errorMsg, 
+                        'trace' => $e->getTraceAsString(),
+                        'debug_info' => [
+                            'date' => $date ?? 'not_set',
+                            'start_time' => $start_time ?? 'not_set',
+                            'end_time' => $end_time ?? 'not_set',
+                            'driver' => $driver ?? 'not_set'
+                        ]
+                    ]);
                     exit;
                 }
             }
