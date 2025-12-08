@@ -9,6 +9,8 @@ $pdo = get_pdo();
 $driver = get_db_driver();
 
 try {
+    error_log("Starting sample data insertion for driver: " . $driver);
+    
     // Clear existing sample data (optional)
     $pdo->exec('DELETE FROM appointments');
     $pdo->exec('DELETE FROM billing');
@@ -17,6 +19,7 @@ try {
     $pdo->exec('DELETE FROM doctors');
     $pdo->exec('DELETE FROM patients');
     $pdo->exec('DELETE FROM users WHERE email != \'admin@hospital.com\'');
+    error_log("Cleared existing sample data");
 
     // Users with different RBAC roles
     $users = [
@@ -107,6 +110,7 @@ try {
             $insertedRoomIds[] = $pdo->lastInsertId();
         }
     }
+    error_log("Inserted " . count($insertedRoomIds) . " rooms");
 
     // Appointments (for the next few days) - use actual patient, doctor, and room IDs
     $appointments = [];
