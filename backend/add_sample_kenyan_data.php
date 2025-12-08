@@ -161,18 +161,20 @@ try {
         }
     }
 
-    // Create some sample billing records
-    $billing = [
-        ['patient_id' => 1, 'amount' => 1500, 'notes' => 'Consultation fee'],
-        ['patient_id' => 2, 'amount' => 800, 'notes' => 'Vaccination'],
-        ['patient_id' => 3, 'amount' => 2000, 'notes' => 'Prenatal care'],
-        ['patient_id' => 4, 'amount' => 1200, 'notes' => 'Follow-up visit'],
-        ['patient_id' => 5, 'amount' => 3500, 'notes' => 'Pre-op assessment'],
+    // Create some sample billing records using actual patient IDs
+    $billingData = [
+        ['amount' => 1500, 'notes' => 'Consultation fee'],
+        ['amount' => 800, 'notes' => 'Vaccination'],
+        ['amount' => 2000, 'notes' => 'Prenatal care'],
+        ['amount' => 1200, 'notes' => 'Follow-up visit'],
+        ['amount' => 3500, 'notes' => 'Pre-op assessment'],
     ];
 
-    foreach ($billing as $b) {
-        $stmt = $pdo->prepare('INSERT INTO billing (patient_id, amount, status, notes, created_at) VALUES (?, ?, ?, ?, ?)');
-        $stmt->execute([$b['patient_id'], $b['amount'], 'pending', $b['notes'], date('Y-m-d H:i:s')]);
+    foreach ($billingData as $index => $b) {
+        if (isset($insertedPatientIds[$index])) {
+            $stmt = $pdo->prepare('INSERT INTO billing (patient_id, amount, status, notes, created_at) VALUES (?, ?, ?, ?, ?)');
+            $stmt->execute([$insertedPatientIds[$index], $b['amount'], 'pending', $b['notes'], date('Y-m-d H:i:s')]);
+        }
     }
 
     echo "Sample Kenyan data created successfully!\n";
