@@ -207,9 +207,20 @@ try {
                     $end_time = $_GET['end_time'] ?? '18:00';
                     
                     // Get all doctors first
-                    $stmt = $pdo->prepare("SELECT id, first_name, last_name, specialty FROM doctors ORDER BY last_name, first_name");
-                    $stmt->execute();
-                    $all_doctors = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                    try {
+                        $stmt = $pdo->prepare("SELECT id, first_name, last_name, specialty FROM doctors ORDER BY last_name, first_name");
+                        $stmt->execute();
+                        $all_doctors = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                    } catch (Exception $e) {
+                        // Doctors table might not exist, return empty results
+                        echo json_encode([
+                            'date' => $date,
+                            'available_doctors' => [],
+                            'available_rooms' => [],
+                            'time_slots' => []
+                        ]);
+                        exit;
+                    }
 
                     // Filter doctors based on their work schedule, leave status, and existing appointments
                     $available_doctors = [];
@@ -257,26 +268,31 @@ try {
                     $roomDateExpr = sql_date_cast('start_time');
                     $roomStartExpr = sql_time_cast('start_time');
                     $roomEndExpr = sql_time_cast('end_time');
-                    $stmt = $pdo->prepare("
-                        SELECT r.id, r.room_number, r.room_name, r.room_type
-                        FROM rooms r
-                        WHERE r.is_available = 1
-                        AND r.id NOT IN (
-                            SELECT DISTINCT room_id 
-                            FROM appointments 
-                            WHERE room_id IS NOT NULL
-                            AND status != 'cancelled'
-                            AND " . $roomDateExpr . " = ?
-                            AND (
-                                (" . $roomStartExpr . " >= ? AND " . $roomStartExpr . " < ?)
-                                OR (" . $roomEndExpr . " > ? AND " . $roomEndExpr . " <= ?)
-                                OR (" . $roomStartExpr . " <= ? AND " . $roomEndExpr . " >= ?)
+                    try {
+                        $stmt = $pdo->prepare("
+                            SELECT r.id, r.room_number, r.room_name, r.room_type
+                            FROM rooms r
+                            WHERE r.is_available = 1
+                            AND r.id NOT IN (
+                                SELECT DISTINCT room_id 
+                                FROM appointments 
+                                WHERE room_id IS NOT NULL
+                                AND status != 'cancelled'
+                                AND " . $roomDateExpr . " = ?
+                                AND (
+                                    (" . $roomStartExpr . " >= ? AND " . $roomStartExpr . " < ?)
+                                    OR (" . $roomEndExpr . " > ? AND " . $roomEndExpr . " <= ?)
+                                    OR (" . $roomStartExpr . " <= ? AND " . $roomEndExpr . " >= ?)
+                                )
                             )
-                        )
-                        ORDER BY r.room_number
-                    ");
-                    $stmt->execute([$date, $start_time, $end_time, $start_time, $end_time, $start_time, $end_time]);
-                    $available_rooms = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                            ORDER BY r.room_number
+                        ");
+                        $stmt->execute([$date, $start_time, $end_time, $start_time, $end_time, $start_time, $end_time]);
+                        $available_rooms = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                    } catch (Exception $e) {
+                        // Rooms table might not exist or other error
+                        $available_rooms = [];
+                    }
                     
                     // Generate time slots (every 30 minutes)
                     $time_slots = [];
