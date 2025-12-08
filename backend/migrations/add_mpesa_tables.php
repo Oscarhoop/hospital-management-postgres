@@ -8,21 +8,35 @@
 
 require_once __DIR__ . '/../db.php';
 
+function get_driver(): string {
+    $config = include __DIR__ . '/../config.php';
+    if (!empty($config['driver'])) {
+        return $config['driver'];
+    }
+    $dsn = $config['dsn'] ?? '';
+    return str_starts_with($dsn, 'pgsql:') ? 'pgsql' : 'sqlite';
+}
+
 try {
     $pdo = get_pdo();
+    $driver = get_driver();
     
-    echo "Starting M-Pesa database migration...\n\n";
+    echo "Starting M-Pesa database migration using {$driver}...\n\n";
     
     // 1. Add M-Pesa columns to billing table
     echo "1. Adding M-Pesa columns to billing table...\n";
     
+    $transactionStatusCheck = $driver === 'pgsql'
+        ? "ALTER TABLE billing ADD COLUMN transaction_status TEXT DEFAULT NULL CHECK(transaction_status IN ('initiated','processing','completed','failed','cancelled'))"
+        : "ALTER TABLE billing ADD COLUMN transaction_status TEXT DEFAULT NULL CHECK(transaction_status IN ('initiated', 'processing', 'completed', 'failed', 'cancelled'))";
+
     $alterBillingQueries = [
         "ALTER TABLE billing ADD COLUMN mpesa_checkout_request_id VARCHAR(100) DEFAULT NULL",
         "ALTER TABLE billing ADD COLUMN mpesa_transaction_id VARCHAR(100) DEFAULT NULL",
         "ALTER TABLE billing ADD COLUMN mpesa_receipt_number VARCHAR(100) DEFAULT NULL",
         "ALTER TABLE billing ADD COLUMN mpesa_phone_number VARCHAR(20) DEFAULT NULL",
-        "ALTER TABLE billing ADD COLUMN mpesa_amount DECIMAL(10,2) DEFAULT NULL",
-        "ALTER TABLE billing ADD COLUMN transaction_status TEXT DEFAULT NULL CHECK(transaction_status IN ('initiated', 'processing', 'completed', 'failed', 'cancelled'))",
+        "ALTER TABLE billing ADD COLUMN mpesa_amount NUMERIC(10,2) DEFAULT NULL",
+        $transactionStatusCheck,
         "ALTER TABLE billing ADD COLUMN mpesa_response_description TEXT DEFAULT NULL",
     ];
     
@@ -31,8 +45,7 @@ try {
             $pdo->exec($query);
             echo "  ✓ Executed: " . substr($query, 0, 80) . "...\n";
         } catch (PDOException $e) {
-            // Column might already exist
-            if (strpos($e->getMessage(), 'duplicate column') !== false) {
+            if (stripos($e->getMessage(), 'duplicate') !== false || stripos($e->getMessage(), 'exists') !== false) {
                 echo "  ℹ Column already exists, skipping...\n";
             } else {
                 echo "  ⚠ Warning: " . $e->getMessage() . "\n";
@@ -43,49 +56,102 @@ try {
     // 2. Create M-Pesa transactions table
     echo "\n2. Creating mpesa_transactions table...\n";
     
-    $createTransactionsTable = "
-    CREATE TABLE IF NOT EXISTS mpesa_transactions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        billing_id INTEGER DEFAULT NULL,
-        merchant_request_id VARCHAR(100) NOT NULL,
-        checkout_request_id VARCHAR(100) NOT NULL,
-        result_code INTEGER DEFAULT NULL,
-        result_desc VARCHAR(255) DEFAULT NULL,
-        mpesa_receipt_number VARCHAR(100) DEFAULT NULL,
-        transaction_date DATETIME DEFAULT NULL,
-        phone_number VARCHAR(20) NOT NULL,
-        amount DECIMAL(10,2) NOT NULL,
-        account_reference VARCHAR(100) DEFAULT NULL,
-        transaction_desc VARCHAR(255) DEFAULT NULL,
-        transaction_type VARCHAR(50) DEFAULT 'STK_PUSH',
-        status TEXT DEFAULT 'initiated' CHECK(status IN ('initiated', 'processing', 'completed', 'failed', 'cancelled', 'timeout')),
-        callback_data TEXT DEFAULT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        
-        FOREIGN KEY (billing_id) REFERENCES billing(id) ON DELETE SET NULL
-    )
-    ";
+    if ($driver === 'pgsql') {
+        $createTransactionsTable = <<<'SQL'
+CREATE TABLE IF NOT EXISTS mpesa_transactions (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    billing_id BIGINT REFERENCES billing(id) ON DELETE SET NULL,
+    merchant_request_id VARCHAR(100) NOT NULL,
+    checkout_request_id VARCHAR(100) NOT NULL,
+    result_code INTEGER,
+    result_desc VARCHAR(255),
+    mpesa_receipt_number VARCHAR(100),
+    transaction_date TIMESTAMPTZ,
+    phone_number VARCHAR(20) NOT NULL,
+    amount NUMERIC(10,2) NOT NULL,
+    account_reference VARCHAR(100),
+    transaction_desc VARCHAR(255),
+    transaction_type VARCHAR(50) DEFAULT 'STK_PUSH',
+    status TEXT DEFAULT 'initiated' CHECK(status IN ('initiated','processing','completed','failed','cancelled','timeout')),
+    callback_data TEXT,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+SQL;
+        $updateTimestampTrigger = <<<'SQL'
+CREATE OR REPLACE FUNCTION update_mpesa_transactions_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE TRIGGER trg_mpesa_transactions_updated
+BEFORE UPDATE ON mpesa_transactions
+FOR EACH ROW EXECUTE FUNCTION update_mpesa_transactions_updated_at();
+SQL;
+    } else {
+        $createTransactionsTable = <<<'SQL'
+CREATE TABLE IF NOT EXISTS mpesa_transactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    billing_id INTEGER DEFAULT NULL,
+    merchant_request_id VARCHAR(100) NOT NULL,
+    checkout_request_id VARCHAR(100) NOT NULL,
+    result_code INTEGER DEFAULT NULL,
+    result_desc VARCHAR(255) DEFAULT NULL,
+    mpesa_receipt_number VARCHAR(100) DEFAULT NULL,
+    transaction_date DATETIME DEFAULT NULL,
+    phone_number VARCHAR(20) NOT NULL,
+    amount DECIMAL(10,2) NOT NULL,
+    account_reference VARCHAR(100) DEFAULT NULL,
+    transaction_desc VARCHAR(255) DEFAULT NULL,
+    transaction_type VARCHAR(50) DEFAULT 'STK_PUSH',
+    status TEXT DEFAULT 'initiated' CHECK(status IN ('initiated', 'processing', 'completed', 'failed', 'cancelled', 'timeout')),
+    callback_data TEXT DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (billing_id) REFERENCES billing(id) ON DELETE SET NULL
+);
+SQL;
+        $updateTimestampTrigger = '';
+    }
     
     $pdo->exec($createTransactionsTable);
+    if ($updateTimestampTrigger) {
+        $pdo->exec($updateTimestampTrigger);
+    }
     echo "  ✓ mpesa_transactions table created successfully\n";
     
     // 3. Create M-Pesa logs table for debugging
     echo "\n3. Creating mpesa_logs table...\n";
     
-    $createLogsTable = "
-    CREATE TABLE IF NOT EXISTS mpesa_logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        request_type VARCHAR(50) NOT NULL,
-        request_data TEXT DEFAULT NULL,
-        response_data TEXT DEFAULT NULL,
-        status_code INTEGER DEFAULT NULL,
-        error_message TEXT DEFAULT NULL,
-        ip_address VARCHAR(45) DEFAULT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-    ";
-    
+    $createLogsTable = $driver === 'pgsql'
+        ? <<<'SQL'
+CREATE TABLE IF NOT EXISTS mpesa_logs (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    request_type VARCHAR(50) NOT NULL,
+    request_data TEXT,
+    response_data TEXT,
+    status_code INTEGER,
+    error_message TEXT,
+    ip_address VARCHAR(45),
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+SQL
+        : <<<'SQL'
+CREATE TABLE IF NOT EXISTS mpesa_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    request_type VARCHAR(50) NOT NULL,
+    request_data TEXT DEFAULT NULL,
+    response_data TEXT DEFAULT NULL,
+    status_code INTEGER DEFAULT NULL,
+    error_message TEXT DEFAULT NULL,
+    ip_address VARCHAR(45) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+SQL;
+
     $pdo->exec($createLogsTable);
     echo "  ✓ mpesa_logs table created successfully\n";
     

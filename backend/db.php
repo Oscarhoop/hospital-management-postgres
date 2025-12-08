@@ -1,12 +1,28 @@
 <?php
-// db.php - helper to obtain a PDO instance based on config
-$config = include __DIR__ . '/config.php';
+// db.php - helper utilities for database access
+
+function get_db_config() {
+    static $config = null;
+    if ($config === null) {
+        $config = include __DIR__ . '/config.php';
+    }
+    return $config;
+}
+
+function get_db_driver(): string {
+    $cfg = get_db_config();
+    if (!empty($cfg['driver'])) {
+        return strtolower($cfg['driver']);
+    }
+    $dsn = $cfg['dsn'] ?? '';
+    return str_starts_with($dsn, 'pgsql:') ? 'pgsql' : 'sqlite';
+}
 
 function get_pdo() {
     static $pdo = null;
     if ($pdo) return $pdo;
 
-    $cfg = include __DIR__ . '/config.php';
+    $cfg = get_db_config();
     $dsn = $cfg['dsn'];
     $user = $cfg['user'];
     $pass = $cfg['pass'];

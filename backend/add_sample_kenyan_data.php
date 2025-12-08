@@ -6,6 +6,7 @@ ini_set('display_errors', 1);
 require_once __DIR__ . '/db.php';
 
 $pdo = get_pdo();
+$driver = get_db_driver();
 
 try {
     // Clear existing sample data (optional)
@@ -15,7 +16,7 @@ try {
     $pdo->exec('DELETE FROM rooms');
     $pdo->exec('DELETE FROM doctors');
     $pdo->exec('DELETE FROM patients');
-    $pdo->exec('DELETE FROM users WHERE email != "admin@hospital.com"');
+    $pdo->exec('DELETE FROM users WHERE email != \'admin@hospital.com\'');
 
     // Users with different RBAC roles
     $users = [
@@ -102,7 +103,13 @@ try {
     }
 
     // Populate sample staff schedules if scheduling tables exist
-    $hasStaffSchedules = $pdo->query("SELECT name FROM sqlite_master WHERE type='table' AND name='staff_schedules'")->fetch();
+    $hasStaffSchedules = false;
+    try {
+        $pdo->query('SELECT 1 FROM staff_schedules LIMIT 1');
+        $hasStaffSchedules = true;
+    } catch (Exception $ignored) {
+        $hasStaffSchedules = false;
+    }
     if ($hasStaffSchedules) {
         $today = new DateTime('now');
         $scheduleSamples = [

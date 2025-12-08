@@ -16,12 +16,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 session_start();
 
-// Database connection
-$dsn = 'sqlite:' . __DIR__ . '/../data/database.sqlite';
+require_once __DIR__ . '/../db.php';
+
 try {
-    $db = new PDO($dsn);
-    $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-} catch (PDOException $e) {
+    $db = get_pdo();
+    $driver = get_db_driver();
+} catch (Exception $e) {
     http_response_code(500);
     echo json_encode(['error' => 'Database connection failed']);
     exit;
@@ -84,12 +84,21 @@ if (!function_exists('log_audit_trail_old')) {
 }
 
 // Check if required tables exist
-function checkTablesExist($db) {
+function checkTablesExist($db, $driver) {
     $tables = ['staff_schedules', 'users', 'shift_templates'];
     foreach ($tables as $table) {
-        $stmt = $db->query("SELECT name FROM sqlite_master WHERE type='table' AND name='$table'");
-        if (!$stmt->fetch()) {
-            return false;
+        if ($driver === 'sqlite') {
+            $stmt = $db->prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = :table");
+            $stmt->execute([':table' => $table]);
+            if (!$stmt->fetch()) {
+                return false;
+            }
+        } else {
+            $stmt = $db->prepare("SELECT 1 FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = :table");
+            $stmt->execute([':table' => $table]);
+            if (!$stmt->fetchColumn()) {
+                return false;
+            }
         }
     }
     return true;
@@ -97,7 +106,7 @@ function checkTablesExist($db) {
 
 try {
     // Check if scheduling tables exist
-    if (!checkTablesExist($db)) {
+    if (!checkTablesExist($db, $driver)) {
         http_response_code(503);
         echo json_encode(['error' => 'Scheduling tables not found. Please run the database setup script: backend/setup_scheduling_tables.php']);
         exit;
@@ -219,6 +228,30 @@ try {
             } elseif ($action === 'list') {
                 // List schedules with filters and related information
                 log_audit_trail_old($db, 'list_schedules', 'schedule', null, ['filters' => $_GET]);
+
+                $patientNamesSubquery = $driver === 'pgsql'
+                    ? "(SELECT STRING_AGG(p.first_name || ' ' || p.last_name, ', ' ORDER BY a.start_time)
+                           FROM appointments a
+                           JOIN patients p ON a.patient_id = p.id
+                           LEFT JOIN doctors d ON a.doctor_id = d.id
+                           LEFT JOIN users u2 ON (d.email = u2.email OR (d.first_name || ' ' || d.last_name) LIKE '%' || u2.name || '%')
+                           WHERE u2.id = ss.user_id
+                           AND DATE(a.start_time) = ss.schedule_date
+                           AND TIME(a.start_time) >= ss.start_time
+                           AND TIME(a.start_time) < ss.end_time
+                           AND a.status != 'cancelled') as patient_names"
+                    : "(SELECT GROUP_CONCAT(p.first_name || ' ' || p.last_name)
+                           FROM appointments a
+                           JOIN patients p ON a.patient_id = p.id
+                           LEFT JOIN doctors d ON a.doctor_id = d.id
+                           LEFT JOIN users u2 ON (d.email = u2.email OR (d.first_name || ' ' || d.last_name) LIKE '%' || u2.name || '%')
+                           WHERE u2.id = ss.user_id
+                           AND DATE(a.start_time) = ss.schedule_date
+                           AND TIME(a.start_time) >= ss.start_time
+                           AND TIME(a.start_time) < ss.end_time
+                           AND a.status != 'cancelled'
+                           LIMIT 3) as patient_names";
+
                 $sql = "SELECT ss.*, 
                                u.name as user_name, u.role, u.email as user_email, u.phone as user_phone,
                                st.name as shift_name, st.color,
@@ -231,17 +264,7 @@ try {
                                 AND TIME(a.start_time) >= ss.start_time 
                                 AND TIME(a.start_time) < ss.end_time
                                 AND a.status != 'cancelled') as appointment_count,
-                               (SELECT GROUP_CONCAT(p.first_name || ' ' || p.last_name) 
-                                FROM appointments a
-                                JOIN patients p ON a.patient_id = p.id
-                                LEFT JOIN doctors d ON a.doctor_id = d.id
-                                LEFT JOIN users u2 ON (d.email = u2.email OR (d.first_name || ' ' || d.last_name) LIKE '%' || u2.name || '%')
-                                WHERE u2.id = ss.user_id
-                                AND DATE(a.start_time) = ss.schedule_date
-                                AND TIME(a.start_time) >= ss.start_time 
-                                AND TIME(a.start_time) < ss.end_time
-                                AND a.status != 'cancelled'
-                                LIMIT 3) as patient_names
+                               {$patientNamesSubquery}
                         FROM staff_schedules ss
                         JOIN users u ON ss.user_id = u.id
                         LEFT JOIN shift_templates st ON ss.shift_template_id = st.id

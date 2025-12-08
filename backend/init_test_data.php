@@ -8,6 +8,7 @@ function log_message($message) {
 }
 
 function clear_tables($pdo) {
+    $driver = get_db_driver();
     $tables = [
         'audit_trail',
         'billing',
@@ -18,31 +19,39 @@ function clear_tables($pdo) {
         'users',
         'rooms'
     ];
-    
+
     foreach ($tables as $table) {
+        if ($driver === 'pgsql') {
+            $pdo->exec("TRUNCATE TABLE $table RESTART IDENTITY CASCADE");
+            continue;
+        }
+
         try {
             $pdo->exec("DELETE FROM $table");
-            if ($table !== 'sqlite_sequence') {
-                $pdo->exec("DELETE FROM sqlite_sequence WHERE name = '$table'");
-            }
-        } catch (Exception $e) {
-            log_message("Warning: Could not clear table $table - " . $e->getMessage());
+            $pdo->exec("DELETE FROM sqlite_sequence WHERE name = '$table'");
+        } catch (Exception $ex) {
+            log_message("Warning: Could not clear table $table - " . $ex->getMessage());
         }
     }
 }
 
 try {
     $pdo = get_pdo();
-    
+    $driver = get_db_driver();
+
     // Clear all data first
     log_message("Clearing existing data...");
-    $pdo->exec('PRAGMA foreign_keys = OFF');
-    clear_tables($pdo);
-    $pdo->exec('PRAGMA foreign_keys = ON');
-    
+    if ($driver === 'sqlite') {
+        $pdo->exec('PRAGMA foreign_keys = OFF');
+        clear_tables($pdo);
+        $pdo->exec('PRAGMA foreign_keys = ON');
+    } else {
+        clear_tables($pdo);
+    }
+
     // Start transaction
     $pdo->beginTransaction();
-    
+
     // Create test users (including doctors as users for scheduling) with Kenyan names
     $users = [
         ['Admin User', 'admin@hospital.com', password_hash('admin123', PASSWORD_DEFAULT), 'admin'],

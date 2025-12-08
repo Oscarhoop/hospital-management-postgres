@@ -41,6 +41,25 @@ require_once __DIR__ . '/permissions.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 $pdo = get_pdo();
+$driver = get_db_driver();
+
+function group_by_month_expression(string $column, string $driver): string {
+    if ($driver === 'pgsql') {
+        return "to_char(date_trunc('month', {$column}), 'YYYY-MM')";
+    }
+    return "strftime('%Y-%m', {$column})";
+}
+
+function month_equals_now_expression(string $column, string $driver): string {
+    if ($driver === 'pgsql') {
+        return "date_trunc('month', {$column}) = date_trunc('month', CURRENT_TIMESTAMP)";
+    }
+    return "strftime('%Y-%m', {$column}) = strftime('%Y-%m', 'now')";
+}
+
+function boolean_value(string $driver, string $value): string {
+    return $driver === 'pgsql' ? ($value === '1' ? 'TRUE' : 'FALSE') : $value;
+}
 
 // Helper functions
 function read_json() {
@@ -92,16 +111,12 @@ try {
                 
                 // New patients this month
                 try {
-                    $stmt = $pdo->query('
-                        SELECT COUNT(*) FROM patients 
-                        WHERE is_active = 1 AND strftime("%Y-%m", created_at) = strftime("%Y-%m", "now")
-                    ');
+                    $expr = month_equals_now_expression('created_at', $driver);
+                    $stmt = $pdo->query("SELECT COUNT(*) FROM patients WHERE is_active = 1 AND {$expr}");
                     $stats['new_patients_month'] = $stmt->fetchColumn();
                 } catch (Exception $e) {
-                    $stmt = $pdo->query('
-                        SELECT COUNT(*) FROM patients 
-                        WHERE strftime("%Y-%m", created_at) = strftime("%Y-%m", "now")
-                    ');
+                    $expr = month_equals_now_expression('created_at', $driver);
+                    $stmt = $pdo->query("SELECT COUNT(*) FROM patients WHERE {$expr}");
                     $stats['new_patients_month'] = $stmt->fetchColumn();
                 }
                 
@@ -176,21 +191,10 @@ try {
                 
                 try {
                     // Age groups
-                    $stmt = $pdo->prepare('
-                        SELECT 
-                            CASE 
-                                WHEN dob IS NULL THEN "Unknown"
-                                WHEN (julianday("now") - julianday(dob))/365 < 18 THEN "Under 18"
-                                WHEN (julianday("now") - julianday(dob))/365 BETWEEN 18 AND 30 THEN "18-30"
-                                WHEN (julianday("now") - julianday(dob))/365 BETWEEN 31 AND 50 THEN "31-50"
-                                WHEN (julianday("now") - julianday(dob))/365 BETWEEN 51 AND 70 THEN "51-70"
-                                ELSE "Over 70"
-                            END as age_group,
-                            COUNT(*) as count
-                        FROM patients 
-                        WHERE created_at BETWEEN ? AND ?
-                        GROUP BY age_group
-                    ');
+                    $ageExpr = $driver === 'pgsql'
+                        ? "CASE \n                                WHEN dob IS NULL THEN 'Unknown'\n                                WHEN EXTRACT(YEAR FROM AGE(dob)) < 18 THEN 'Under 18'\n                                WHEN EXTRACT(YEAR FROM AGE(dob)) BETWEEN 18 AND 30 THEN '18-30'\n                                WHEN EXTRACT(YEAR FROM AGE(dob)) BETWEEN 31 AND 50 THEN '31-50'\n                                WHEN EXTRACT(YEAR FROM AGE(dob)) BETWEEN 51 AND 70 THEN '51-70'\n                                ELSE 'Over 70'\n                           END"
+                        : "CASE \n                                WHEN dob IS NULL THEN 'Unknown'\n                                WHEN (julianday('now') - julianday(dob))/365 < 18 THEN 'Under 18'\n                                WHEN (julianday('now') - julianday(dob))/365 BETWEEN 18 AND 30 THEN '18-30'\n                                WHEN (julianday('now') - julianday(dob))/365 BETWEEN 31 AND 50 THEN '31-50'\n                                WHEN (julianday('now') - julianday(dob))/365 BETWEEN 51 AND 70 THEN '51-70'\n                                ELSE 'Over 70'\n                           END";
+                    $stmt = $pdo->prepare("SELECT {$ageExpr} as age_group, COUNT(*) as count FROM patients WHERE created_at BETWEEN ? AND ? GROUP BY age_group");
                     $stmt->execute([$dateFrom . ' 00:00:00', $dateTo . ' 23:59:59']);
                     $report['age_groups'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 } catch (Exception $e) {
@@ -199,7 +203,8 @@ try {
                 
                 // Monthly registrations trend
                 try {
-                    $stmt = $pdo->prepare('\n                        SELECT strftime("%Y-%m", created_at) as month, COUNT(*) as count\n                        FROM patients\n                        WHERE created_at BETWEEN ? AND ?\n                        GROUP BY strftime("%Y-%m", created_at)\n                        ORDER BY month\n                    ');
+                    $monthExpr = group_by_month_expression('created_at', $driver);
+                    $stmt = $pdo->prepare("SELECT {$monthExpr} as month, COUNT(*) as count FROM patients WHERE created_at BETWEEN ? AND ? GROUP BY {$monthExpr} ORDER BY month");
                     $stmt->execute([$dateFrom . ' 00:00:00', $dateTo . ' 23:59:59']);
                     $report['monthly_registrations'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 } catch (Exception $e) {
@@ -270,13 +275,8 @@ try {
                 $report['revenue_by_status'] = $stmt->fetchAll();
                 
                 // Monthly revenue trends
-                $stmt = $pdo->prepare('
-                    SELECT strftime("%Y-%m", created_at) as month, COALESCE(SUM(amount), 0) as total_amount
-                    FROM billing 
-                    WHERE created_at BETWEEN ? AND ?
-                    GROUP BY strftime("%Y-%m", created_at)
-                    ORDER BY month
-                ');
+                $monthExpr = group_by_month_expression('created_at', $driver);
+                $stmt = $pdo->prepare("SELECT {$monthExpr} as month, COALESCE(SUM(amount), 0) as total_amount FROM billing WHERE created_at BETWEEN ? AND ? GROUP BY {$monthExpr} ORDER BY month");
                 $stmt->execute([$from, $to]);
                 $report['monthly_revenue'] = $stmt->fetchAll();
                 

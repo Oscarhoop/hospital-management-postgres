@@ -10,19 +10,29 @@ require_once __DIR__ . '/audit.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 $pdo = get_pdo();
+$driver = get_db_driver();
 
 function ensure_doctor_license_column($pdo) {
+    $driver = get_db_driver();
     try {
-        $stmt = $pdo->query("PRAGMA table_info(doctors)");
-        $hasColumn = false;
-        while ($col = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            if ($col['name'] === 'license_number') {
-                $hasColumn = true;
-                break;
+        if ($driver === 'sqlite') {
+            $stmt = $pdo->query("PRAGMA table_info(doctors)");
+            $hasColumn = false;
+            while ($col = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                if ($col['name'] === 'license_number') {
+                    $hasColumn = true;
+                    break;
+                }
             }
-        }
-        if (!$hasColumn) {
-            $pdo->exec('ALTER TABLE doctors ADD COLUMN license_number TEXT');
+            if (!$hasColumn) {
+                $pdo->exec('ALTER TABLE doctors ADD COLUMN license_number TEXT');
+            }
+        } else {
+            $stmt = $pdo->prepare("SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = :table AND column_name = :column");
+            $stmt->execute([':table' => 'doctors', ':column' => 'license_number']);
+            if (!$stmt->fetchColumn()) {
+                $pdo->exec('ALTER TABLE doctors ADD COLUMN license_number TEXT');
+            }
         }
     } catch (Exception $e) {
         if (strpos(strtolower($e->getMessage()), 'duplicate column name') === false) {

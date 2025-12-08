@@ -1,0 +1,38 @@
+services:
+  # Web Service
+  - type: web
+    name: hospital-management
+    env: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /
+    envVars:
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_HOST
+        value: ${postgres.HOSTNAME}
+      - key: DB_PORT
+        value: ${postgres.PORT}
+      - key: DB_DATABASE
+        value: ${postgres.DATABASE}
+      - key: DB_USERNAME
+        value: ${postgres.USER}
+      - key: DB_PASSWORD
+        value: ${postgres.PASSWORD}
+      - key: PORT
+        value: 10000
+
+  # PostgreSQL Database
+  - type: pserv
+    name: postgres
+    env: docker
+    plan: free
+    repo: https://github.com/render-examples/postgres
+    envVars:
+      - key: POSTGRES_DB
+        value: hospital_mgmt
+      - key: POSTGRES_USER
+        value: hospital_app
+      - key: POSTGRES_PASSWORD
+        generateValue: true
+        sync: false
