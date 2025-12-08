@@ -150,7 +150,7 @@ function isDoctorAvailable(PDO $pdo, int $doctorId, string $startTime, string $e
             SELECT COUNT(*) 
             FROM leave_requests 
             WHERE user_id = ? 
-            AND status = \'approved\' 
+            AND status = 'approved' 
             AND start_date <= ? 
             AND end_date >= ?
         ");
