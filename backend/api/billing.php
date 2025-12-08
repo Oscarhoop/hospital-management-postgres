@@ -45,6 +45,16 @@ function is_logged_in() {
     return isset($_SESSION['user_id']) && !empty($_SESSION['user_id']);
 }
 
+function nullable($value) {
+    if ($value === null) {
+        return null;
+    }
+    if (is_string($value) && trim($value) === '') {
+        return null;
+    }
+    return $value;
+}
+
 try {
     switch ($method) {
         case 'GET':
@@ -154,12 +164,12 @@ try {
                 ) VALUES (?, ?, ?, ?, ?, ?)
             ');
             $stmt->execute([
-                $data['patient_id'],
-                $data['appointment_id'] ?? null,
-                $data['amount'],
-                $data['status'] ?? 'pending',
-                $data['due_date'] ?? null,
-                $data['notes'] ?? null
+                (int)$data['patient_id'],
+                nullable($data['appointment_id'] ?? null),
+                isset($data['amount']) ? (float)$data['amount'] : null,
+                nullable($data['status'] ?? 'pending'),
+                nullable($data['due_date'] ?? null),
+                nullable($data['notes'] ?? null)
             ]);
             
             $id = $pdo->lastInsertId();
@@ -214,35 +224,35 @@ try {
             
             if (isset($data['patient_id'])) {
                 $updates[] = 'patient_id=?';
-                $params[] = $data['patient_id'];
+                $params[] = (int)$data['patient_id'];
             }
             if (isset($data['appointment_id'])) {
                 $updates[] = 'appointment_id=?';
-                $params[] = $data['appointment_id'];
+                $params[] = nullable($data['appointment_id']);
             }
             if (isset($data['amount'])) {
                 $updates[] = 'amount=?';
-                $params[] = $data['amount'];
+                $params[] = (float)$data['amount'];
             }
             if (isset($data['status'])) {
                 $updates[] = 'status=?';
-                $params[] = $data['status'];
+                $params[] = nullable($data['status']);
             }
             if (isset($data['due_date'])) {
                 $updates[] = 'due_date=?';
-                $params[] = $data['due_date'];
+                $params[] = nullable($data['due_date']);
             }
             if (isset($data['payment_method'])) {
                 $updates[] = 'payment_method=?';
-                $params[] = $data['payment_method'];
+                $params[] = nullable($data['payment_method']);
             }
             if (isset($data['payment_date'])) {
                 $updates[] = 'payment_date=?';
-                $params[] = $data['payment_date'];
+                $params[] = nullable($data['payment_date']);
             }
             if (isset($data['notes'])) {
                 $updates[] = 'notes=?';
-                $params[] = $data['notes'];
+                $params[] = nullable($data['notes']);
             }
             
             $updates[] = 'updated_at=CURRENT_TIMESTAMP';
