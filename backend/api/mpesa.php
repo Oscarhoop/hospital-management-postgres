@@ -9,6 +9,7 @@ session_start();
 require_once __DIR__ . '/../cors.php';
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../config/mpesa_config.php';
+require_once __DIR__ . '/../config/mpesa_mock.php';
 require_once __DIR__ . '/audit.php';
 require_once __DIR__ . '/permissions.php';
 
@@ -54,6 +55,11 @@ function log_mpesa_request($request_type, $request_data, $response_data = null, 
  * Generate M-Pesa OAuth Access Token
  */
 function get_mpesa_access_token() {
+    // Use mock mode if Daraja is down
+    if (is_mock_mode()) {
+        return mock_generate_access_token();
+    }
+    
     $config = get_mpesa_config();
     $consumer_key = $config['consumer_key'];
     $consumer_secret = $config['consumer_secret'];
@@ -85,6 +91,11 @@ function get_mpesa_access_token() {
  * Initiate STK Push (Lipa Na M-Pesa Online)
  */
 function initiate_stk_push($phone_number, $amount, $account_reference, $transaction_desc) {
+    // Use mock mode if Daraja is down
+    if (is_mock_mode()) {
+        return mock_initiate_stk_push($phone_number, $amount, $account_reference, $transaction_desc);
+    }
+    
     $config = get_mpesa_config();
     $access_token = get_mpesa_access_token();
     

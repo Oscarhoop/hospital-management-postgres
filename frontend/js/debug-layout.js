@@ -97,7 +97,7 @@ function diagnoseLayout() {
         
         // Check if title is somehow inside topbar
         if (topbar && topbar.contains(title)) {
-            console.error(`  ⚠️ WARNING: This page-title is INSIDE the topbar!`);
+            console.error(`WARNING: This page-title is INSIDE the topbar!`);
         }
     });
 
@@ -134,9 +134,9 @@ function diagnoseLayout() {
         console.log('Container index in main-content:', containerIndex);
         
         if (topbarIndex >= 0 && containerIndex >= 0 && topbarIndex < containerIndex) {
-            console.log('✅ Structure is correct: topbar comes before container');
+            console.log('Structure is correct: topbar comes before container');
         } else {
-            console.error('❌ Structure issue: topbar and container ordering is wrong!');
+            console.error('Structure issue: topbar and container ordering is wrong!');
         }
     }
 
@@ -157,7 +157,7 @@ function diagnoseLayout() {
     if (issues.length > 0) {
         console.error('Issues found:', issues);
     } else {
-        console.log('✅ No obvious positioning issues found');
+        console.log('No obvious positioning issues found');
     }
 
     console.log('\n=== END DIAGNOSTIC REPORT ===\n');
@@ -175,4 +175,4 @@ setTimeout(diagnoseLayout, 1000);
 
 // Make it available globally
 window.diagnoseLayout = diagnoseLayout;
-console.log('💡 You can run diagnoseLayout() anytime in the console');
+console.log('You can run diagnoseLayout() anytime in the console');
