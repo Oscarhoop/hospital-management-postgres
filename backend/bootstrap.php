@@ -1,6 +1,9 @@
 <?php
 // Centralized bootstrap to run optional setup tasks before starting the PHP server.
 
+require_once __DIR__ . '/env.php';
+load_project_env();
+
 $projectRoot = dirname(__DIR__);
 $backendDir = __DIR__;
 
@@ -27,12 +30,22 @@ function run_script(string $label, string $scriptPath): void {
     }
 }
 
+$isLocalEnv = app_env() === 'local';
 $runDbReset = env_flag('RUN_DB_RESET', false);
-$runSchedulingSetup = env_flag('RUN_SCHEDULING_SETUP', true);
-$runSampleData = env_flag('RUN_SAMPLE_DATA', true);
+$runSchedulingSetup = env_flag('RUN_SCHEDULING_SETUP', $isLocalEnv);
+$runSampleData = env_flag('RUN_SAMPLE_DATA', $isLocalEnv);
+$runInitDb = env_flag('RUN_INIT_DB', $isLocalEnv);
 
-// Always run database initialization (it's safe to run on existing DB)
-run_script('Database initialization', $backendDir . '/init_db.php');
+if ($runInitDb) {
+    run_script('Database initialization', $backendDir . '/init_db.php');
+} else {
+    echo "[BOOT] Database initialization skipped (set RUN_INIT_DB=true to enable).\n";
+}
+
+if ($runDbReset && is_production()) {
+    fwrite(STDERR, "[BOOT] RUN_DB_RESET is blocked in production.\n");
+    exit(1);
+}
 
 if ($runSchedulingSetup) {
     run_script('Scheduling tables setup', $backendDir . '/setup_scheduling_tables.php');

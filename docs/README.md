@@ -101,6 +101,9 @@ The database includes tables for users, patients, doctors, appointments, medical
    - `DB_PATH` (optional) to point to a custom SQLite file location
    - `MPESA_*` keys for sandbox and/or production as documented in `docs/MPESA_INTEGRATION.md`
    - Any additional secrets (kept outside version control)
+   - `APP_ENV` (`local`, `staging`, `production`) to control safe defaults and error output
+   - `CORS_ALLOWED_ORIGINS` as a comma-separated allowlist (example: `http://localhost:8000,https://yourdomain.com`)
+   - `RUN_INIT_DB`, `RUN_SCHEDULING_SETUP`, `RUN_SAMPLE_DATA` to explicitly control bootstrap tasks
    > Tip: On Render or any container platform, set these via the provider's environment settings rather than committing them.
 
 7. **Start the server:**
