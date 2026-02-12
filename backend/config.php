@@ -1,30 +1,11 @@
 <?php
-// Central database configuration with basic .env loading.
+// Central database configuration with APP_ENV-aware bootstrap support.
 // Supports both SQLite (default) and PostgreSQL based on DB_CONNECTION.
 
-// Lightweight .env loader so local values can be stored outside version control.
+require_once __DIR__ . '/env.php';
+load_project_env();
+
 $projectRoot = dirname(__DIR__);
-$envFile = $projectRoot . '/.env';
-if (file_exists($envFile)) {
-    $content = file_get_contents($envFile);
-    // Handle UTF-16 LE with BOM (Windows PowerShell default)
-    if (substr($content, 0, 2) === "\xFF\xFE") {
-        $content = iconv('UTF-16LE', 'UTF-8', $content);
-    }
-    // Remove UTF-8 BOM if present
-    $content = preg_replace('/^\xEF\xBB\xBF/', '', $content);
-    $lines = explode("\n", $content);
-    foreach ($lines as $line) {
-        $line = trim($line);
-        if (empty($line) || str_starts_with($line, '#')) {
-            continue;
-        }
-        [$key, $value] = array_map('trim', explode('=', $line, 2) + [1 => '']);
-        if ($key !== '') {
-            putenv("{$key}={$value}");
-        }
-    }
-}
 
 $driver = strtolower(getenv('DB_CONNECTION') ?: 'sqlite');
 

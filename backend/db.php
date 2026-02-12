@@ -1,6 +1,9 @@
 <?php
 // db.php - helper utilities for database access
 
+require_once __DIR__ . '/env.php';
+configure_error_handling();
+
 function get_db_config() {
     static $config = null;
     if ($config === null) {
@@ -37,10 +40,6 @@ function get_pdo() {
             }
         }
 
-        // Enable PDO error information
-        error_reporting(E_ALL);
-        ini_set('display_errors', 1);
-
         $pdo = new PDO($dsn, $user, $pass, [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
@@ -48,7 +47,8 @@ function get_pdo() {
     } catch (Exception $e) {
         http_response_code(500);
         error_log('Database error: ' . $e->getMessage());
-        echo json_encode(['error' => 'DB connection failed: ' . $e->getMessage()]);
+        $message = is_production() ? 'DB connection failed' : ('DB connection failed: ' . $e->getMessage());
+        echo json_encode(['error' => $message]);
         exit;
     }
     return $pdo;

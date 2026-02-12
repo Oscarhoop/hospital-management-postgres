@@ -1,14 +1,10 @@
 <?php
 // Authentication API endpoints
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-ini_set('log_errors', 1);
+require_once __DIR__ . '/../env.php';
+configure_error_handling();
 ini_set('error_log', __DIR__ . '/../logs/auth_errors.log');
 
-header('Access-Control-Allow-Origin: ' . ($_SERVER['HTTP_ORIGIN'] ?? 'http://localhost:8000'));
-header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
-header('Access-Control-Allow-Credentials: true');
+apply_cors_headers();
 
 // Set secure session cookie parameters BEFORE starting session
 $hostWithPort = $_SERVER['HTTP_HOST'] ?? 'localhost';
@@ -44,11 +40,9 @@ require_once __DIR__ . '/audit.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 $rawInput = file_get_contents('php://input');
-error_log("[AUTH] ===== NEW REQUEST =====");
-error_log("[AUTH] Method: $method");
-error_log("[AUTH] Request URI: " . ($_SERVER['REQUEST_URI'] ?? 'N/A'));
-error_log("[AUTH] Session ID: " . session_id());
-error_log("[AUTH] Raw input: " . $rawInput);
+if (!is_production()) {
+    error_log("[AUTH] Request: $method " . ($_SERVER['REQUEST_URI'] ?? 'N/A'));
+}
 
 $pdo = get_pdo();
 
@@ -56,7 +50,6 @@ $pdo = get_pdo();
 function read_json() {
     global $rawInput;
     $data = json_decode($rawInput, true);
-    error_log("[AUTH] Decoded JSON: " . json_encode($data));
     return $data ?: [];
 }
 
@@ -95,42 +88,30 @@ try {
             
             switch ($action) {
                 case 'login':
-                    error_log("[AUTH] Login attempt started");
-                    error_log("[AUTH] Received data: " . json_encode($data));
-                    
                     $email = $data['email'] ?? '';
                     $password = $data['password'] ?? '';
                     
-                    error_log("[AUTH] Email: $email, Password length: " . strlen($password));
-                    
                     if (empty($email) || empty($password)) {
-                        error_log("[AUTH] FAILED - Empty email or password");
                         http_response_code(400);
                         echo json_encode(['error' => 'Email and password required']);
                         exit;
                     }
                     
-                    error_log("[AUTH] Querying database for user: $email");
                     $stmt = $pdo->prepare('SELECT * FROM users WHERE LOWER(email) = LOWER(?)');
                     $stmt->execute([$email]);
                     $user = $stmt->fetch();
                     
                     if (!$user) {
-                        error_log("[AUTH] FAILED - User not found: $email");
                         http_response_code(401);
                         echo json_encode(['error' => 'Invalid credentials']);
                         exit;
                     }
                     
-                    error_log("[AUTH] User found, verifying password");
                     if (!password_verify($password, $user['password'])) {
-                        error_log("[AUTH] FAILED - Invalid password for: $email");
                         http_response_code(401);
                         echo json_encode(['error' => 'Invalid credentials']);
                         exit;
                     }
-                    
-                    error_log("[AUTH] Password verified successfully");
                     
                     // Normalize role (trim spaces)
                     $user['role'] = trim($user['role'] ?? '');
@@ -141,8 +122,6 @@ try {
                     $_SESSION['user_role'] = $user['role'];
                     
                     log_audit_trail('login', 'user', $user['id']);
-                    
-                    error_log("[AUTH] Session created for user: {$user['id']} - {$user['name']} ({$user['role']})");
                     
                     // Regenerate session ID after login to prevent session fixation
                     session_regenerate_id(true);
@@ -156,7 +135,6 @@ try {
                         'message' => 'Login successful'
                     ];
                     
-                    error_log("[AUTH] SUCCESS - Sending response: " . json_encode($response));
                     echo json_encode($response);
                     break;
                     
